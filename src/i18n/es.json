@@ -1,5 +1,6 @@
 {
   "tool.select": "Seleccionar",
+  "tool.move": "Mover",
   "tool.rect": "Rectángulo",
   "tool.ellipse": "Elipse",
   "tool.line": "Línea",

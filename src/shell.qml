@@ -44,6 +44,7 @@ ShellRoot {
         I18n.revision;
         return [
             { id: "select",   icon: "select",   label: I18n.tr("tool.select"),   key: "v" },
+            { id: "move",     icon: "move",     label: I18n.tr("tool.move"),     key: "m" },
             { id: "rect",     icon: "rect",     label: I18n.tr("tool.rect"),     key: "r" },
             { id: "ellipse",  icon: "ellipse",  label: I18n.tr("tool.ellipse"),  key: "o" },
             { id: "line",     icon: "line",     label: I18n.tr("tool.line"),     key: "l" },
@@ -379,7 +380,7 @@ ShellRoot {
     }
 
     function beginDraw(gx, gy) {
-        if (!globalSel || activeTool === "select") return;
+        if (!globalSel || activeTool === "select" || activeTool === "move") return;
         if (activeTool === "text") { placeText(gx, gy); return; }
         if (activeTool === "step") { placeStep(gx, gy); return; }
         var p = clampToSel(gx, gy);
@@ -470,7 +471,7 @@ ShellRoot {
     }
     function pointerPressed(gx, gy) {
         if (resizing !== null) return;
-        if (phase === "editing" && spaceHeld) { beginMoveSel(gx, gy); return; }
+        if (phase === "editing" && (spaceHeld || activeTool === "move")) { beginMoveSel(gx, gy); return; }
         if (phase === "selecting") {
             if (mode === "monitor") selectMonitor(gx, gy);
             else beginSelection(gx, gy);
@@ -1103,6 +1104,7 @@ ShellRoot {
                     moveOffset: root.moveOffset
                     hoverWindow: root.hoverWindow
                     spaceHeld: root.spaceHeld
+                    activeTool: root.activeTool
 
                     onPressedAt: (gx, gy) => root.pointerPressed(gx, gy)
                     onMovedTo: (gx, gy) => root.pointerMoved(gx, gy)

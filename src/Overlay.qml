@@ -35,6 +35,7 @@ Item {
     property var moveOffset: null
     property var hoverWindow: null
     property bool spaceHeld: false
+    property string activeTool: ""
 
     signal pressedAt(real gx, real gy)
     signal movedTo(real gx, real gy)
@@ -528,7 +529,7 @@ Item {
         enabled: overlay.ready
         hoverEnabled: true
         acceptedButtons: overlay.phase === "selecting" ? Qt.LeftButton | Qt.RightButton : Qt.LeftButton
-        cursorShape: overlay.spaceHeld && overlay.phase === "editing"
+        cursorShape: overlay.phase === "editing" && (overlay.spaceHeld || overlay.activeTool === "move")
             ? (overlay.capturing ? Qt.ClosedHandCursor : Qt.OpenHandCursor)
             : Qt.CrossCursor
         onPressed: (m) => {
