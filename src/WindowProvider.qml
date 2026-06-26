@@ -16,7 +16,7 @@ Item {
     id: provider
 
     /**
-     * Detected compositor: "hyprland", "sway", "niri" or "none".
+     * Detected compositor: "hyprland", "sway", "niri", "mango" or "none".
      * Resolved from compositor-specific environment variables, with
      * XDG_CURRENT_DESKTOP as a secondary hint.
      */
@@ -28,6 +28,7 @@ Item {
         if (desktop.indexOf("hyprland") !== -1) return "hyprland";
         if (desktop.indexOf("sway") !== -1) return "sway";
         if (desktop.indexOf("niri") !== -1) return "niri";
+        if (desktop.indexOf("mango") !== -1) return "mango";
         return "none";
     }
 
@@ -45,6 +46,7 @@ Item {
         if (kind === "hyprland") hyprMonitorsProc.running = true;
         else if (kind === "sway") swayProc.running = true;
         else if (kind === "niri") niriWindowsProc.running = true;
+        else if (kind === "mango") mangoProc.running = true;
         else provider.windowsReady([]);
     }
 
@@ -106,6 +108,16 @@ Item {
             if (code !== 0) { provider.windowsReady([]); return; }
             provider.windowsReady(Providers.parseNiri(
                 niriWindowsOut.text, niriWorkspacesOut.text, niriOutputsOut.text));
+        }
+    }
+
+    Process {
+        id: mangoProc
+        command: ["mmsg", "get", "all-clients"]
+        stdout: StdioCollector { id: mangoOut }
+        onExited: (code) => {
+            if (code !== 0) { provider.windowsReady([]); return; }
+            provider.windowsReady(Providers.parseMango(mangoOut.text));
         }
     }
 }

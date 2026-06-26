@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
-const { parseHyprland, parseSway, parseNiri } = require("./providers.js");
+const { parseHyprland, parseSway, parseNiri, parseMango } = require("./providers.js");
 
 let failed = 0;
 function eq(actual, expected, msg) {
@@ -165,6 +165,37 @@ eq(parseNiri(niriWindowsOffset, niriWorkspaces, niriOutputsObject), [
 eq(parseNiri(niriWindows, niriWorkspaces, "{bad"), [], "niri bad outputs json -> []");
 eq(parseNiri(niriWindows, "{bad", niriOutputsObject), [], "niri bad workspaces json -> []");
 eq(parseNiri("{bad", niriWorkspaces, niriOutputsObject), [], "niri bad windows json -> []");
+
+const mangoClients = JSON.stringify({
+    clients: [
+        { id: 152, pid: 21907, title: "foot", appid: "footclient", x: 10, y: 54, width: 1258, height: 1376, is_focused: true },
+        { id: 149, pid: 30473, title: "Telegram", appid: "org.telegram.desktop", x: 10, y: 54, width: 2540, height: 1376, is_focused: false },
+        { id: 138, pid: 20471, title: "Code", appid: "code-oss", x: 10, y: 54, width: 2540, height: 1376, is_focused: false },
+        { id: 132, pid: 31730, title: "Firefox", appid: "firefox", x: 1273, y: 54, width: 1277, height: 1376, is_focused: false },
+        { id: 1, pid: 3516, title: "Spotify", appid: "Spotify", x: 10, y: 54, width: 2540, height: 1376, is_focused: false }
+    ]
+});
+eq(parseMango(mangoClients), [
+    { x: 10, y: 54, w: 1258, h: 1376, z: 0 },
+    { x: 10, y: 54, w: 2540, h: 1376, z: 1 },
+    { x: 10, y: 54, w: 2540, h: 1376, z: 2 },
+    { x: 1273, y: 54, w: 1277, h: 1376, z: 3 },
+    { x: 10, y: 54, w: 2540, h: 1376, z: 4 }
+], "mango extracts all clients, focused gets z=0, others counter-ordered");
+
+const mangoClientsZeroSize = JSON.stringify({
+    clients: [
+        { id: 1, x: 10, y: 20, width: 0, height: 0, is_focused: true },
+        { id: 2, x: 30, y: 40, width: 800, height: 600, is_focused: false }
+    ]
+});
+eq(parseMango(mangoClientsZeroSize), [
+    { x: 30, y: 40, w: 800, h: 600, z: 1 }
+], "mango skips zero-size windows");
+
+eq(parseMango("not json"), [], "mango bad json -> []");
+eq(parseMango(JSON.stringify({})), [], "mango missing clients key -> []");
+eq(parseMango(JSON.stringify({ clients: null })), [], "mango null clients -> []");
 
 if (failed > 0) {
     console.log("\n" + failed + " test(s) FAILED");

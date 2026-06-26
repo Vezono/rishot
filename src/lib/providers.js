@@ -210,6 +210,41 @@ function parseNiri(windowsJson, workspacesJson, outputsJson) {
     return rects;
 }
 
+/**
+ * Parse mangowm `mmsg get all-clients` JSON into global window rects.
+ *
+ * mangowm returns all clients with absolute global coordinates (x, y, width,
+ * height) and an `is_focused` flag. The focused window receives the smallest z
+ * (0); all others are ordered by a counter so the topmost window wins the
+ * caller's hit test.
+ *
+ * @param {string} clientsJson Raw stdout of `mmsg get all-clients`.
+ * @returns {Array<{x: number, y: number, w: number, h: number, z: number}>}
+ */
+function parseMango(clientsJson) {
+    var rects = [];
+    try {
+        var data = JSON.parse(clientsJson);
+        var clients = data.clients;
+        if (!Array.isArray(clients)) return [];
+        var counter = 1;
+        for (var i = 0; i < clients.length; i++) {
+            var c = clients[i];
+            if (c.width <= 0 || c.height <= 0) continue;
+            rects.push({
+                x: c.x,
+                y: c.y,
+                w: c.width,
+                h: c.height,
+                z: c.is_focused ? 0 : counter++
+            });
+        }
+    } catch (e) {
+        return [];
+    }
+    return rects;
+}
+
 if (typeof module !== "undefined" && module.exports) {
-    module.exports = { parseHyprland, parseSway, parseNiri };
+    module.exports = { parseHyprland, parseSway, parseNiri, parseMango };
 }
