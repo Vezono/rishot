@@ -113,11 +113,21 @@ Item {
 
     Process {
         id: mangoProc
-        command: ["mmsg", "get", "all-clients"]
-        stdout: StdioCollector { id: mangoOut }
+        command: ["mmsg", "get", "all-monitors"]
+        stdout: StdioCollector { id: mangoMonitorsOut }
         onExited: (code) => {
             if (code !== 0) { provider.windowsReady([]); return; }
-            provider.windowsReady(Providers.parseMango(mangoOut.text));
+            mangoClientsProc.running = true;
+        }
+    }
+
+    Process {
+        id: mangoClientsProc
+        command: ["mmsg", "get", "all-clients"]
+        stdout: StdioCollector { id: mangoClientsOut }
+        onExited: (code) => {
+            if (code !== 0) { provider.windowsReady([]); return; }
+            provider.windowsReady(Providers.parseMango(mangoClientsOut.text, mangoMonitorsOut.text));
         }
     }
 }

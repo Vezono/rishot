@@ -211,19 +211,37 @@ function parseNiri(windowsJson, workspacesJson, outputsJson) {
 }
 
 /**
- * Parse mangowm `mmsg get all-clients` JSON into global window rects.
+ * Parse mangowm `mmsg get all-clients` and `mmsg get all-monitors` JSON into
+ * global window rects, keeping only clients on active tags.
  *
- * mangowm returns all clients with absolute global coordinates (x, y, width,
- * height) and an `is_focused` flag. The focused window receives the smallest z
- * (0); all others are ordered by a counter so the topmost window wins the
- * caller's hit test.
+ * mangowm client coordinates are already in global compositor space, so they
+ * map directly. The monitors payload carries per-monitor tag lists with
+ * `is_active`; only clients whose tags intersect the active set for their
+ * monitor are kept. The focused window receives the smallest z (0); all others
+ * are ordered by a counter.
  *
  * @param {string} clientsJson Raw stdout of `mmsg get all-clients`.
+ * @param {string} monitorsJson Raw stdout of `mmsg get all-monitors`.
  * @returns {Array<{x: number, y: number, w: number, h: number, z: number}>}
  */
-function parseMango(clientsJson) {
+function parseMango(clientsJson, monitorsJson) {
     var rects = [];
     try {
+        var activeTags = {};
+        var monitorsData = JSON.parse(monitorsJson);
+        var monitors = monitorsData.monitors;
+        if (Array.isArray(monitors)) {
+            for (var m = 0; m < monitors.length; m++) {
+                var mon = monitors[m];
+                var tags = mon.tags;
+                if (!Array.isArray(tags)) continue;
+                var set = {};
+                for (var t = 0; t < tags.length; t++) {
+                    if (tags[t].is_active) set[tags[t].index] = true;
+                }
+                activeTags[mon.name] = set;
+            }
+        }
         var data = JSON.parse(clientsJson);
         var clients = data.clients;
         if (!Array.isArray(clients)) return [];
@@ -231,6 +249,14 @@ function parseMango(clientsJson) {
         for (var i = 0; i < clients.length; i++) {
             var c = clients[i];
             if (c.width <= 0 || c.height <= 0) continue;
+            var monActive = activeTags[c.monitor];
+            var onActive = false;
+            if (monActive && Array.isArray(c.tags)) {
+                for (var j = 0; j < c.tags.length; j++) {
+                    if (monActive[c.tags[j]]) { onActive = true; break; }
+                }
+            }
+            if (!onActive) continue;
             rects.push({
                 x: c.x,
                 y: c.y,

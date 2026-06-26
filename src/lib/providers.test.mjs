@@ -166,36 +166,94 @@ eq(parseNiri(niriWindows, niriWorkspaces, "{bad"), [], "niri bad outputs json ->
 eq(parseNiri(niriWindows, "{bad", niriOutputsObject), [], "niri bad workspaces json -> []");
 eq(parseNiri("{bad", niriWorkspaces, niriOutputsObject), [], "niri bad windows json -> []");
 
-const mangoClients = JSON.stringify({
-    clients: [
-        { id: 152, pid: 21907, title: "foot", appid: "footclient", x: 10, y: 54, width: 1258, height: 1376, is_focused: true },
-        { id: 149, pid: 30473, title: "Telegram", appid: "org.telegram.desktop", x: 10, y: 54, width: 2540, height: 1376, is_focused: false },
-        { id: 138, pid: 20471, title: "Code", appid: "code-oss", x: 10, y: 54, width: 2540, height: 1376, is_focused: false },
-        { id: 132, pid: 31730, title: "Firefox", appid: "firefox", x: 1273, y: 54, width: 1277, height: 1376, is_focused: false },
-        { id: 1, pid: 3516, title: "Spotify", appid: "Spotify", x: 10, y: 54, width: 2540, height: 1376, is_focused: false }
+const mangoMonitors = JSON.stringify({
+    monitors: [
+        {
+            name: "HDMI-A-2", x: 0, y: 0, width: 2560, height: 1440,
+            tags: [
+                { index: 1, is_active: false },
+                { index: 2, is_active: true },
+                { index: 3, is_active: false },
+                { index: 7, is_active: false }
+            ]
+        },
+        {
+            name: "eDP-1", x: 0, y: 1440, width: 2560, height: 1600,
+            tags: [
+                { index: 1, is_active: false },
+                { index: 2, is_active: false },
+                { index: 3, is_active: false }
+            ]
+        }
     ]
 });
-eq(parseMango(mangoClients), [
+
+const mangoClients = JSON.stringify({
+    clients: [
+        { id: 152, pid: 21907, title: "foot", appid: "footclient", monitor: "HDMI-A-2", tags: [2], x: 10, y: 54, width: 1258, height: 1376, is_focused: true },
+        { id: 149, pid: 30473, title: "Telegram", appid: "org.telegram.desktop", monitor: "HDMI-A-2", tags: [3], x: 10, y: 54, width: 2540, height: 1376, is_focused: false },
+        { id: 138, pid: 20471, title: "Code", appid: "code-oss", monitor: "HDMI-A-2", tags: [7], x: 10, y: 54, width: 2540, height: 1376, is_focused: false },
+        { id: 132, pid: 31730, title: "Firefox", appid: "firefox", monitor: "HDMI-A-2", tags: [2], x: 1273, y: 54, width: 1277, height: 1376, is_focused: false },
+        { id: 1, pid: 3516, title: "Spotify", appid: "Spotify", monitor: "HDMI-A-2", tags: [1], x: 10, y: 54, width: 2540, height: 1376, is_focused: false }
+    ]
+});
+eq(parseMango(mangoClients, mangoMonitors), [
     { x: 10, y: 54, w: 1258, h: 1376, z: 0 },
-    { x: 10, y: 54, w: 2540, h: 1376, z: 1 },
-    { x: 10, y: 54, w: 2540, h: 1376, z: 2 },
-    { x: 1273, y: 54, w: 1277, h: 1376, z: 3 },
-    { x: 10, y: 54, w: 2540, h: 1376, z: 4 }
-], "mango extracts all clients, focused gets z=0, others counter-ordered");
+    { x: 1273, y: 54, w: 1277, h: 1376, z: 1 }
+], "mango keeps only clients on active tags, focused gets z=0");
 
 const mangoClientsZeroSize = JSON.stringify({
     clients: [
-        { id: 1, x: 10, y: 20, width: 0, height: 0, is_focused: true },
-        { id: 2, x: 30, y: 40, width: 800, height: 600, is_focused: false }
+        { id: 1, monitor: "HDMI-A-2", tags: [2], x: 10, y: 20, width: 0, height: 0, is_focused: true },
+        { id: 2, monitor: "HDMI-A-2", tags: [2], x: 30, y: 40, width: 800, height: 600, is_focused: false }
     ]
 });
-eq(parseMango(mangoClientsZeroSize), [
+eq(parseMango(mangoClientsZeroSize, mangoMonitors), [
     { x: 30, y: 40, w: 800, h: 600, z: 1 }
 ], "mango skips zero-size windows");
 
-eq(parseMango("not json"), [], "mango bad json -> []");
-eq(parseMango(JSON.stringify({})), [], "mango missing clients key -> []");
-eq(parseMango(JSON.stringify({ clients: null })), [], "mango null clients -> []");
+eq(parseMango("not json", mangoMonitors), [], "mango bad clients json -> []");
+eq(parseMango(mangoClients, "}{"), [], "mango bad monitors json -> []");
+eq(parseMango(JSON.stringify({}), mangoMonitors), [], "mango missing clients key -> []");
+eq(parseMango(JSON.stringify({ clients: null }), mangoMonitors), [], "mango null clients -> []");
+
+const mangoNoActiveTags = JSON.stringify({
+    monitors: [
+        { name: "HDMI-A-2", x: 0, y: 0, tags: [{ index: 1, is_active: false }, { index: 2, is_active: false }] }
+    ]
+});
+eq(parseMango(mangoClients, mangoNoActiveTags), [], "mango no active tags -> empty");
+
+const mangoMultiTagClient = JSON.stringify({
+    clients: [
+        { id: 1, monitor: "HDMI-A-2", tags: [1, 2], x: 10, y: 20, width: 800, height: 600, is_focused: false }
+    ]
+});
+eq(parseMango(mangoMultiTagClient, mangoMonitors), [
+    { x: 10, y: 20, w: 800, h: 600, z: 1 }
+], "mango client on multiple tags, one active -> kept");
+
+const mangoSecondMonitorInactive = JSON.stringify({
+    clients: [
+        { id: 1, monitor: "eDP-1", tags: [2], x: 50, y: 1494, width: 800, height: 600, is_focused: false }
+    ]
+});
+eq(parseMango(mangoSecondMonitorInactive, mangoMonitors), [], "mango client on second monitor with inactive tag -> excluded");
+
+const mangoSecondMonitorActive = JSON.stringify({
+    monitors: [
+        { name: "HDMI-A-2", x: 0, y: 0, tags: [{ index: 1, is_active: false }] },
+        { name: "eDP-1", x: 0, y: 1440, tags: [{ index: 2, is_active: true }] }
+    ]
+});
+const mangoClientOnSecond = JSON.stringify({
+    clients: [
+        { id: 1, monitor: "eDP-1", tags: [2], x: 50, y: 1494, width: 800, height: 600, is_focused: true }
+    ]
+});
+eq(parseMango(mangoClientOnSecond, mangoSecondMonitorActive), [
+    { x: 50, y: 1494, w: 800, h: 600, z: 0 }
+], "mango coordinates are already global, passed through as-is");
 
 if (failed > 0) {
     console.log("\n" + failed + " test(s) FAILED");

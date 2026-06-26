@@ -183,6 +183,16 @@ mkdir -p "$rundir" 2>/dev/null || rundir="/tmp"
 lock="$rundir/rishot.lock"
 exec 9>"$lock"
 flock -n 9 || { err already_running; [ -z "$output" ]; exit; }
+
+# Force Qt to honour the compositor's per-output scale rather than any inherited
+# QT_SCALE_FACTOR / DPI overrides. When a compositor (e.g. mango) spawns rishot
+# from a keybind, its environment may carry scaling vars that shrink the
+# layer-shell surfaces and skew pointer coordinates; clearing them keeps the
+# overlay 1:1 with each output's logical geometry no matter how it is launched.
+unset QT_SCALE_FACTOR QT_SCREEN_SCALE_FACTORS QT_FONT_DPI QT_WAYLAND_FORCE_DPI
+export QT_AUTO_SCREEN_SCALE_FACTOR=0
+export QT_ENABLE_HIGHDPI_SCALING=0
+export QT_WAYLAND_DISABLE_WINDOWDECORATION=1
 # XDG_PICTURES_DIR is rarely exported; ask user-dirs for the localised Pictures folder.
 if [ -z "${XDG_PICTURES_DIR:-}" ] && command -v xdg-user-dir >/dev/null 2>&1; then
 	pics=$(xdg-user-dir PICTURES 2>/dev/null || true)
