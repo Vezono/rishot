@@ -48,6 +48,14 @@ cd rishot
 bin/rishot
 ```
 
+On Fedora, for a system-wide install under `/usr` instead of the per-user tree:
+
+```sh
+sh packaging/fedora/build.sh
+```
+
+That packs the checkout into a noarch rpm and installs it with dnf. `--no-install` builds and stops, leaving the rpm in `~/.cache/rishot`. On an atomic system it prints the `rpm-ostree install` line rather than running it, since layering reboots.
+
 Quickshell is in the official repos on Arch (extra), Fedora 44+, Void, and Debian sid / Ubuntu 26.10. Older Fedora pulls it from the `errornointernet/quickshell` COPR, which a Qt version mismatch can sometimes break. `bin/rishot` finds its `src/` via `$RISHOT_CONFIG_DIR`, then `~/.local/share/rishot/src`, `/usr/share/rishot/src`, `/usr/lib/rishot/src`, then `../src`.
 
 </details>
