@@ -173,7 +173,7 @@ command -v qs >/dev/null 2>&1 || {
 	exit 1
 }
 
-# Single instance: a second press while the overlay is up is a no-op. The lock
+# Single instance: a second press replaces the open overlay. The lock
 # is held on fd 9 for the lifetime of qs; clipboard daemons that qs spawns close
 # fd 9 (see shell.qml) so a backgrounded wl-copy cannot pin the lock after exit.
 # Keep the lock in a user-owned dir: XDG_RUNTIME_DIR is per-user 0700, and the
@@ -182,7 +182,20 @@ rundir="${XDG_RUNTIME_DIR:-$HOME/.cache}"
 mkdir -p "$rundir" 2>/dev/null || rundir="/tmp"
 lock="$rundir/rishot.lock"
 exec 9>"$lock"
-flock -n 9 || { err already_running; [ -z "$output" ]; exit; }
+if ! flock -n 9; then
+	# Select only this config, leaving other Quickshell shells alone. Retry in
+	# case the previous launch has the lock but is still registering with qs.
+	attempt=0
+	while :; do
+		qs kill -p "$dir" >/dev/null 2>&1 || :
+		if flock -w 1 9; then break; fi
+		attempt=$((attempt + 1))
+		if [ "$attempt" -ge 5 ]; then
+			echo "rishot: could not stop the previous overlay; relaunch failed" >&2
+			exit 1
+		fi
+	done
+fi
 
 # Force Qt to honour the compositor's per-output scale rather than any inherited
 # QT_SCALE_FACTOR / DPI overrides. When a compositor (e.g. mango) spawns rishot

@@ -28,6 +28,8 @@ curl -fsSL https://raw.githubusercontent.com/Gakuseei/rishot/main/install.sh | s
 
 Bind a key (see [Keybinding](#keybinding)) and run `rishot`. The installer pulls deps through your package manager and never touches your compositor config.
 
+Running `rishot` again closes the current overlay and starts a fresh capture in the requested mode.
+
 <details><summary>Other ways to install</summary>
 
 Inspect before you pipe:
