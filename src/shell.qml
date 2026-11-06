@@ -1005,8 +1005,30 @@ ShellRoot {
             color: "transparent"
             exclusionMode: ExclusionMode.Ignore
             WlrLayershell.layer: WlrLayer.Overlay
-            WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+            /**
+             * The keyboard grab waits for the frozen frame. Taking it at map
+             * time pulls focus off whatever is below, and apps that auto-hide
+             * their popups on focus loss (Firefox menus, GTK menus, Electron)
+             * close them before the frame lands, so the shot shows a closed
+             * menu. ov.ready flips on the first captured frame, after which the
+             * grab is safe: the popup is already in the frozen image.
+             */
+            WlrLayershell.keyboardFocus: ov.ready
+                ? WlrKeyboardFocus.Exclusive
+                : WlrKeyboardFocus.None
             WlrLayershell.namespace: "rishot"
+
+            /**
+             * The pointer grab waits for the frame as well. A full-window input
+             * region takes the pointer off whatever sits below the instant the
+             * overlay maps, and that leave event drops :hover, so tooltips and
+             * hover-opened menus close before the frame lands even though the
+             * keyboard grab now waits. An empty mask lets pointer input fall
+             * through to the app below until ov.ready, then the mask drops and
+             * the overlay takes every event as before.
+             */
+            mask: ov.ready ? null : blankMask
+            readonly property Region blankMask: Region {}
 
             readonly property string scrName: win.modelData.name
             readonly property bool showToolbar: root.toolbarFor(win).visible
