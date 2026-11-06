@@ -15,7 +15,10 @@ ShellRoot {
     property bool capturing: false
     property string phase: "selecting"
     property string activeTool: "rect"
-    property color activeColor: Theme.vermilion
+    /** The accent follows the DMS theme; a colour only sticks once the user picks something else. */
+    property bool accentColor: true
+    property color customColor: Theme.accent
+    readonly property color activeColor: accentColor ? Theme.accent : customColor
     property int activeWidth: 4
     property bool activeFill: false
     property var toolStyle: ({})
@@ -70,7 +73,7 @@ ShellRoot {
         clearSelection();
         activeTool = t;
         var s = toolStyle[t];
-        activeColor = s ? s.color : Theme.vermilion;
+        applyColor(s ? s.color : "accent");
         activeWidth = s ? s.width : 4;
         activeFill = s ? (s.filled === true) : false;
     }
@@ -79,11 +82,18 @@ ShellRoot {
     function toolHasFill(t) { return t === "rect" || t === "ellipse"; }
 
     function styleEntry() {
-        return { color: String(activeColor), width: activeWidth, filled: activeFill };
+        return { color: accentColor ? "accent" : String(customColor), width: activeWidth, filled: activeFill };
+    }
+
+    /** "accent", or the old default orange that earlier configs stored, means follow the theme. */
+    function applyColor(c) {
+        var legacy = String(c).toLowerCase() === "#e0563b";
+        accentColor = c === "accent" || legacy || Qt.colorEqual(c, Theme.accent);
+        if (!accentColor) customColor = c;
     }
 
     function setToolColor(c) {
-        activeColor = c;
+        applyColor(c);
         var s = Object.assign({}, toolStyle);
         s[activeTool] = styleEntry();
         toolStyle = s;

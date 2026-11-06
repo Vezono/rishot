@@ -1,28 +1,58 @@
 pragma Singleton
 import QtQuick
 import Quickshell
+import Quickshell.Io
 
 Singleton {
     id: theme
 
-    readonly property color vermilion: "#e0563b"
-    readonly property color white:     "#ffffff"
-    readonly property color idle:      "#c4ccda"
-    readonly property color sep:       "#313a4d"
+    // DMS rewrites this file whenever its theme changes; the hardcoded values below are the fallback when it is absent.
+    readonly property string colorsPath: (Quickshell.env("XDG_CACHE_HOME") || (Quickshell.env("HOME") + "/.cache")) + "/dms/dms-colors.json"
+    property var roles: ({})
 
-    readonly property color dim:        Qt.rgba(8 / 255, 10 / 255, 16 / 255, 0.62)
-    readonly property color glassBg:    Qt.rgba(20 / 255, 24 / 255, 34 / 255, 0.92)
-    readonly property color glassBorder: "#313a4d"
-    readonly property color panelBg:    Qt.rgba(24 / 255, 28 / 255, 38 / 255, 0.97)
-    readonly property color panelBorder: "#3a4456"
+    function role(name, fallback) {
+        return roles[name] || fallback;
+    }
 
-    readonly property color dimIcon: Qt.rgba(0.77, 0.80, 0.85, 0.55)
-    readonly property color winFill: Qt.rgba(0.88, 0.34, 0.23, 0.16)
+    function parse(text) {
+        try {
+            var d = JSON.parse(text);
+            var scheme = d.colors ? (d.colors[d.mode] || d.colors.dark) : null;
+            roles = scheme || {};
+        } catch (e) {
+            roles = {};
+        }
+    }
+
+    FileView {
+        path: theme.colorsPath
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: theme.parse(text())
+        onLoadFailed: theme.roles = {}
+    }
+
+    readonly property color accent:    role("primary", "#e0563b")
+    readonly property color onAccent:  role("on_primary", "#ffffff")
+    readonly property color fg:        role("on_surface", "#ffffff")
+    readonly property color idle:      role("on_surface_variant", "#c4ccda")
+    readonly property color sep:       role("outline_variant", "#313a4d")
+
+    readonly property color dim:        Qt.alpha(role("scrim", "#080a10"), 0.62)
+    readonly property color glassBg:    Qt.alpha(role("surface_container", "#141822"), 0.92)
+    readonly property color glassBorder: role("outline_variant", "#313a4d")
+    readonly property color panelBg:    Qt.alpha(role("surface_container_high", "#181c26"), 0.97)
+    readonly property color panelBorder: role("outline", "#3a4456")
+
+    readonly property color dimIcon: Qt.alpha(idle, 0.55)
+    readonly property color winFill: Qt.alpha(accent, 0.16)
+    readonly property color hover:       Qt.alpha(fg, 0.06)
+    readonly property color hoverStrong: Qt.alpha(fg, 0.10)
     readonly property color markerYellow: "#f5d020"
-    readonly property color stepText: white
+    readonly property color stepText: onAccent
 
     readonly property var swatches: [
-        "#e0563b", "#ffffff", "#1a1a1a", "#e23b3b", "#f2c14e", "#5bbf73", "#4f8fe0"
+        String(accent), "#ffffff", "#1a1a1a", "#e23b3b", "#f2c14e", "#5bbf73", "#4f8fe0"
     ]
 
     readonly property string monoFamily: pick(

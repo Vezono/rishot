@@ -45,15 +45,15 @@ Item {
                     Layout.preferredHeight: 34
                     radius: 7
                     readonly property bool sel: pop.selected === modelData.id
-                    color: sel ? Theme.vermilion
-                        : (hh.hovered ? Qt.rgba(1, 1, 1, 0.06) : "transparent")
+                    color: sel ? Theme.accent
+                        : (hh.hovered ? Theme.hover : "transparent")
 
                     Rectangle {
                         anchors.centerIn: parent
                         width: modelData.dot
                         height: modelData.dot
                         radius: width / 2
-                        color: parent.sel ? Theme.white : Theme.idle
+                        color: parent.sel ? Theme.onAccent : Theme.idle
                     }
 
                     HoverHandler { id: hh }

@@ -17,7 +17,7 @@ Item {
 
     readonly property color glassBg: Theme.panelBg
     readonly property color glassBorder: Theme.panelBorder
-    readonly property color vermilion: Theme.vermilion
+    readonly property color accent: Theme.accent
     readonly property color idle: Theme.idle
 
     readonly property bool isHyprland: !!Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE")
@@ -151,7 +151,7 @@ Item {
 
     /** The bright accent reading on the right of a slider row. */
     component Value: Text {
-        color: panel.vermilion
+        color: panel.accent
         font.family: Theme.monoFamily
         font.pixelSize: 13
         font.bold: true
@@ -185,8 +185,8 @@ Item {
         Rectangle {
             anchors.fill: parent
             radius: height / 2
-            color: tg.checked ? panel.vermilion : Qt.rgba(1, 1, 1, 0.10)
-            border.color: tg.checked ? panel.vermilion : panel.glassBorder
+            color: tg.checked ? panel.accent : Theme.hoverStrong
+            border.color: tg.checked ? panel.accent : panel.glassBorder
             border.width: 1
             Behavior on color { ColorAnimation { duration: 120 } }
 
@@ -196,7 +196,7 @@ Item {
                 radius: 8
                 anchors.verticalCenter: parent.verticalCenter
                 x: tg.checked ? parent.width - width - 3 : 3
-                color: Theme.white
+                color: Theme.fg
                 Behavior on x { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
             }
         }
@@ -234,13 +234,13 @@ Item {
             width: parent.width
             height: 4
             radius: 2
-            color: Qt.rgba(1, 1, 1, 0.10)
+            color: Theme.hoverStrong
 
             Rectangle {
                 width: parent.width * slider.frac
                 height: parent.height
                 radius: 2
-                color: panel.vermilion
+                color: panel.accent
             }
         }
 
@@ -251,8 +251,8 @@ Item {
             radius: 7
             anchors.verticalCenter: parent.verticalCenter
             x: slider.frac * slider.travel
-            color: drag.active ? panel.vermilion : Theme.white
-            border.color: panel.vermilion
+            color: drag.active ? panel.accent : Theme.fg
+            border.color: panel.accent
             border.width: 2
         }
 
@@ -280,16 +280,16 @@ Item {
         implicitHeight: 28
         radius: 6
         implicitWidth: cbLabel.implicitWidth + 22
-        color: cb.checked ? panel.vermilion
-            : (cbHover.hovered ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(1, 1, 1, 0.06))
-        border.color: cb.checked ? panel.vermilion : panel.glassBorder
+        color: cb.checked ? panel.accent
+            : (cbHover.hovered ? Theme.hoverStrong : Theme.hover)
+        border.color: cb.checked ? panel.accent : panel.glassBorder
         border.width: 1
 
         Text {
             id: cbLabel
             anchors.centerIn: parent
             text: cb.label
-            color: cb.checked ? Theme.white : panel.idle
+            color: cb.checked ? Theme.fg : panel.idle
             font.family: Theme.monoFamily
             font.pixelSize: 12
         }
@@ -331,9 +331,9 @@ Item {
                     Layout.preferredHeight: 18
                 }
                 Text {
-                    text: I18n.tr("settings.title", { brand: '<font color="#e0563b">rishot</font>' })
+                    text: I18n.tr("settings.title", { brand: '<font color="' + Theme.accent + '">rishot</font>' })
                     textFormat: Text.StyledText
-                    color: Theme.white
+                    color: Theme.fg
                     font.family: Theme.sansFamily
                     font.pixelSize: 14
                     font.weight: Font.Medium
@@ -434,7 +434,7 @@ Item {
                     Layout.preferredHeight: 28
                     Layout.preferredWidth: pickLabel.implicitWidth + 22
                     radius: 6
-                    color: pickHover.hovered ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(1, 1, 1, 0.06)
+                    color: pickHover.hovered ? Theme.hoverStrong : Theme.hover
                     border.color: panel.glassBorder
                     border.width: 1
 
@@ -509,16 +509,16 @@ Item {
                     Layout.preferredHeight: 28
                     Layout.preferredWidth: recLabel.implicitWidth + 24
                     radius: 6
-                    color: panel.listening ? panel.vermilion
-                        : (recHover.hovered ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(1, 1, 1, 0.06))
-                    border.color: panel.listening ? panel.vermilion : panel.glassBorder
+                    color: panel.listening ? panel.accent
+                        : (recHover.hovered ? Theme.hoverStrong : Theme.hover)
+                    border.color: panel.listening ? panel.accent : panel.glassBorder
                     border.width: 1
 
                     Text {
                         id: recLabel
                         anchors.centerIn: parent
                         text: panel.listening ? I18n.tr("settings.press_key") : I18n.tr("settings.record")
-                        color: panel.listening ? Theme.white : panel.idle
+                        color: panel.listening ? Theme.fg : panel.idle
                         font.family: Theme.monoFamily
                         font.pixelSize: 13
                     }

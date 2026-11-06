@@ -57,7 +57,7 @@ Item {
         : null
 
     readonly property color dimColor: Theme.dim
-    readonly property color vermilion: Theme.vermilion
+    readonly property color accent: Theme.accent
 
     function selectionBox() {
         if (selectedIndex === null || !model
@@ -304,7 +304,7 @@ Item {
                     height: zoomCell.rh
                     radius: zoomCell.corner
                     color: "transparent"
-                    border.color: overlay.vermilion
+                    border.color: overlay.accent
                     border.width: 2
                     antialiasing: true
                 }
@@ -420,7 +420,7 @@ Item {
         Rectangle {
             anchors.fill: parent
             color: "transparent"
-            border.color: overlay.vermilion
+            border.color: overlay.accent
             border.width: 1.5
         }
 
@@ -428,7 +428,7 @@ Item {
             text: overlay.globalSel
                 ? "⛩ rishot · " + Math.round(overlay.globalSel.w) + "×" + Math.round(overlay.globalSel.h)
                 : ""
-            color: overlay.vermilion
+            color: overlay.accent
             style: Text.Outline
             styleColor: Qt.rgba(0, 0, 0, 0.7)
             font.family: Theme.monoFamily
@@ -452,7 +452,7 @@ Item {
         Rectangle {
             anchors.fill: parent
             color: Theme.winFill
-            border.color: overlay.vermilion
+            border.color: overlay.accent
             border.width: 2.5
             antialiasing: true
         }
@@ -469,7 +469,7 @@ Item {
         Rectangle {
             anchors.fill: parent
             color: "transparent"
-            border.color: overlay.vermilion
+            border.color: overlay.accent
             border.width: 1
             antialiasing: true
         }
@@ -485,7 +485,7 @@ Item {
                 required property var modelData
                 width: 5; height: 5
                 radius: 2.5
-                color: overlay.vermilion
+                color: overlay.accent
                 x: modelData.hx * (annSelection.width - width)
                 y: modelData.hy * (annSelection.height - height)
             }
@@ -613,7 +613,7 @@ Item {
                     width: handle.visSize
                     height: handle.visSize
                     radius: 1
-                    color: overlay.vermilion
+                    color: overlay.accent
                     border.color: Qt.rgba(1, 1, 1, 0.85)
                     border.width: 1
                     antialiasing: true
@@ -708,7 +708,7 @@ Item {
                 y: 0
                 width: 1
                 height: parent.height
-                color: Qt.rgba(overlay.vermilion.r, overlay.vermilion.g, overlay.vermilion.b, 0.7)
+                color: Qt.rgba(overlay.accent.r, overlay.accent.g, overlay.accent.b, 0.7)
             }
 
             Rectangle {
@@ -716,7 +716,7 @@ Item {
                 x: 0
                 height: 1
                 width: parent.width
-                color: Qt.rgba(overlay.vermilion.r, overlay.vermilion.g, overlay.vermilion.b, 0.7)
+                color: Qt.rgba(overlay.accent.r, overlay.accent.g, overlay.accent.b, 0.7)
             }
 
             Rectangle {
@@ -724,7 +724,7 @@ Item {
                 width: loupe.zoom
                 height: loupe.zoom
                 color: "transparent"
-                border.color: overlay.vermilion
+                border.color: overlay.accent
                 border.width: 1
                 antialiasing: true
             }
@@ -734,7 +734,7 @@ Item {
             anchors.fill: parent
             radius: 12
             color: "transparent"
-            border.color: overlay.vermilion
+            border.color: overlay.accent
             border.width: 1.5
             antialiasing: true
         }
@@ -754,7 +754,7 @@ Item {
                 id: coordText
                 anchors.centerIn: parent
                 text: Math.round(loupe.cux + overlay.sx) + ", " + Math.round(loupe.cuy + overlay.sy)
-                color: overlay.vermilion
+                color: overlay.accent
                 font.family: Theme.monoFamily
                 font.pixelSize: 11
             }

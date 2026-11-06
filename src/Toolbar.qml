@@ -8,7 +8,7 @@ Item {
     implicitHeight: glass.implicitHeight
 
     property string activeTool: "rect"
-    property color activeColor: Theme.vermilion
+    property color activeColor: Theme.accent
     property int activeWidth: 4
     property bool activeFill: false
     property bool canUndo: false
@@ -45,7 +45,7 @@ Item {
 
     readonly property color glassBg: Theme.glassBg
     readonly property color glassBorder: Theme.glassBorder
-    readonly property color vermilion: Theme.vermilion
+    readonly property color accent: Theme.accent
     readonly property color idle: Theme.idle
     readonly property color sep: Theme.sep
 
@@ -186,7 +186,7 @@ Item {
                 Layout.preferredWidth: 32
                 Layout.preferredHeight: 32
                 radius: 7
-                color: colorMa.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent"
+                color: colorMa.containsMouse ? Theme.hover : "transparent"
 
                 Rectangle {
                     anchors.centerIn: parent
@@ -218,7 +218,7 @@ Item {
                 Layout.preferredWidth: 32
                 Layout.preferredHeight: 32
                 radius: 7
-                color: widthMa.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent"
+                color: widthMa.containsMouse ? Theme.hover : "transparent"
 
                 Rectangle {
                     anchors.centerIn: parent
@@ -250,7 +250,7 @@ Item {
                 Layout.preferredWidth: visible ? 32 : 0
                 Layout.preferredHeight: 32
                 radius: 7
-                color: fillMa.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent"
+                color: fillMa.containsMouse ? Theme.hover : "transparent"
 
                 Rectangle {
                     anchors.centerIn: parent
@@ -401,7 +401,7 @@ Item {
             Text {
                 visible: tb.hoverKey.length > 0
                 text: tb.hoverKey
-                color: tb.vermilion
+                color: tb.accent
                 font.family: Theme.monoFamily
                 font.pixelSize: 12
             }

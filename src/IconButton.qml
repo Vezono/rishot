@@ -12,7 +12,7 @@ Rectangle {
     width: 32
     height: 32
     radius: 7
-    color: active ? Theme.vermilion : (ma.containsMouse && !dim ? Qt.rgba(1, 1, 1, 0.06) : "transparent")
+    color: active ? Theme.accent : (ma.containsMouse && !dim ? Theme.hover : "transparent")
 
     readonly property color idle: Theme.idle
 
@@ -20,7 +20,7 @@ Rectangle {
         anchors.centerIn: parent
         name: btn.icon
         size: 18
-        tint: btn.active ? Theme.white : (btn.dim ? Theme.dimIcon : btn.idle)
+        tint: btn.active ? Theme.onAccent : (btn.dim ? Theme.dimIcon : btn.idle)
     }
 
     MouseArea {

@@ -6,7 +6,7 @@ Item {
     id: pop
 
     /** Externally driven current colour; seeds the HSV state on change. */
-    property color selected: Theme.vermilion
+    property color selected: Theme.accent
 
     /** Emitted on any swatch, square, hue, or hex commit. */
     signal picked(color c)
@@ -116,7 +116,7 @@ Item {
                     height: 12
                     radius: 6
                     color: "transparent"
-                    border.color: Theme.white
+                    border.color: Theme.fg
                     border.width: 2
                     x: pop.sat * square.width - width / 2
                     y: (1 - pop.val) * square.height - height / 2
@@ -154,7 +154,7 @@ Item {
                     y: -2
                     radius: 3
                     color: "transparent"
-                    border.color: Theme.white
+                    border.color: Theme.fg
                     border.width: 2
                     x: pop.hue * hueStrip.width - width / 2
                 }
@@ -181,7 +181,7 @@ Item {
                         radius: 4
                         color: modelData
                         readonly property bool sel: Qt.colorEqual(pop.selected, modelData)
-                        border.color: sel ? Theme.white
+                        border.color: sel ? Theme.fg
                             : (swHover.hovered ? Qt.rgba(1, 1, 1, 0.5) : Qt.rgba(1, 1, 1, 0.18))
                         border.width: sel ? 2 : 1
                         scale: swHover.hovered ? 1.12 : 1.0
@@ -210,13 +210,13 @@ Item {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 24
                     radius: 5
-                    color: Qt.rgba(1, 1, 1, 0.06)
+                    color: Theme.hover
                     border.color: Theme.panelBorder
                     border.width: 1
 
                     SequentialAnimation {
                         id: hexFlash
-                        ColorAnimation { target: hexBox; property: "border.color"; to: Theme.vermilion; duration: 90 }
+                        ColorAnimation { target: hexBox; property: "border.color"; to: Theme.accent; duration: 90 }
                         ColorAnimation { target: hexBox; property: "border.color"; to: Theme.panelBorder; duration: 240 }
                     }
 
@@ -230,7 +230,7 @@ Item {
                         font.family: Theme.monoFamily
                         font.pixelSize: 12
                         selectByMouse: true
-                        selectionColor: Theme.vermilion
+                        selectionColor: Theme.accent
                         text: pop.hexText
                         maximumLength: 7
                         onActiveFocusChanged: if (activeFocus) selectAll()
