@@ -1242,7 +1242,7 @@ ShellRoot {
      */
     /** A saved gif needs its folder to exist first; a copy goes to the cache dir. */
     function recExport(kind, first, last, step, fps) {
-        if (kind === "gif-save" || kind === "mp4-copy") {
+        if (kind !== "gif-copy") {
             mkdirProc.run(effectiveSaveDir, function () {
                 exportProc.start(kind, first, last, step, fps);
             });
@@ -1257,11 +1257,14 @@ ShellRoot {
         property string kind: ""
         function start(k, first, last, step, fps) {
             kind = k;
-            var gif = k !== "mp4-copy";
-            // An mp4 is handed over as a file reference rather than as bytes
-            // (see recCopyProc), so it has to live somewhere that outlasts this
-            // run and the next recording: the save dir, same as a saved gif.
-            var out = (k === "gif-save" || k === "mp4-copy")
+            var gif = k.indexOf("gif") === 0;
+            // Anything saved, and any mp4, needs a file that outlasts this run:
+            // a save is the point, and an mp4 copy is handed over as a file
+            // reference rather than as bytes (see recCopyProc). A copied gif is
+            // bytes on the clipboard, so its file can stay in the working dir
+            // and be swept with the rest.
+            var toDisk = k !== "gif-copy";
+            var out = toDisk
                 ? root.effectiveSaveDir + "/" + root.timestampName("rec", gif ? "gif" : "mp4")
                 : root.recRoot + "/out.gif";
             root.recExportPath = out;
@@ -1273,10 +1276,10 @@ ShellRoot {
         onExited: (code) => {
             root.recBusy = "";
             if (code !== 0) { root.recFail(exportErr.text.trim()); return; }
-            if (kind === "gif-save") {
-                // Not afterSave(): that copies as image/png, which is the wrong
-                // type for a gif and would strip the animation.
-                if (Config.copyOnSave) { recCopyProc.run(root.recExportPath, "image/gif"); return; }
+            if (kind === "mp4-save") {
+                // Not afterSave(): that copies as image/png, which is wrong for
+                // every type gif mode produces.
+                if (Config.copyOnSave) { recCopyProc.run(root.recExportPath, "uri"); return; }
                 root.recSweep();
                 root.finish(I18n.tr("notify.recording_saved"),
                             root.pretty(root.recExportPath), false, root.recExportPath);
@@ -1368,7 +1371,7 @@ ShellRoot {
 
             onCopyGif: (first, last, step, fps) => root.recExport("gif-copy", first, last, step, fps)
             onCopyMp4: (first, last, step, fps) => root.recExport("mp4-copy", first, last, step, fps)
-            onSaveGif: (first, last, step, fps) => root.recExport("gif-save", first, last, step, fps)
+            onSaveMp4: (first, last, step, fps) => root.recExport("mp4-save", first, last, step, fps)
             onCancel: { root.recSweep(); Qt.quit(); }
         }
     }

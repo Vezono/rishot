@@ -70,7 +70,7 @@ Quickshell is in the official repos on Arch (extra), Fedora 44+, Void, and Debia
 - Per-tool memory: each tool keeps its own colour, width and fill, saved across launches
 - Undo and redo, copy, save, upload
 - Record a region as a gif or mp4, from the toolbar's record button (`Ctrl+G`) or straight into it with `rishot gif`: pause and resume while recording, then trim,
-  thin the frame rate and preview in an ordinary window you can move, resize and focus, before copying or saving (needs `wl-screenrec` or `wf-recorder`,
+  thin the frame rate, change the speed and preview in an ordinary window you can move, resize and focus, then save an mp4 or copy either an mp4 or a gif (needs `wl-screenrec` or `wf-recorder`,
   plus `ffmpeg`; `gifski` makes better gifs when it is installed)
 - Copy the text in a shot with OCR (`Ctrl+T`, needs `tesseract`)
 - Copy every QR code and barcode in a shot (`Ctrl+R`, needs `zbar`)

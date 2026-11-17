@@ -69,12 +69,13 @@
   "gif.exporting": "Exporting…",
   "gif.copy_gif": "Copy GIF",
   "gif.copy_mp4": "Copy MP4",
-  "gif.save_gif": "Save GIF",
   "notify.record_failed": "Recording failed",
   "notify.no_recorder_body": "gif mode needs wf-recorder or wl-screenrec",
   "notify.record_no_frames": "the recording produced no frames",
   "notify.recording_copied": "Recording copied",
   "notify.recording_saved": "Recording saved",
   "tooltip.record": "Record",
-  "gif.window_title": "rishot — recording"
+  "gif.window_title": "rishot — recording",
+  "gif.speed": "{n}×",
+  "gif.save_mp4": "Save MP4"
 }

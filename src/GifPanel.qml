@@ -19,7 +19,7 @@ Item {
 
     signal copyGif(int first, int last, int step, int fps)
     signal copyMp4(int first, int last, int step, int fps)
-    signal saveGif(int first, int last, int step, int fps)
+    signal saveMp4(int first, int last, int step, int fps)
     signal cancel()
 
     property int first: 1
@@ -28,13 +28,23 @@ Item {
     property int playhead: 1
     property bool playing: false
 
+    /**
+     * Playback speed. Thinning and speed are different knobs: step drops
+     * frames and holds the duration, speed keeps every frame and shortens it.
+     * Both land in the same place, the output frame rate, which is what the
+     * exporter writes into the frame timings.
+     */
+    readonly property var speeds: [0.5, 1, 1.5, 2, 3]
+    property int speedIndex: 1
+    readonly property real speed: speeds[speedIndex]
+
     onFrameCountChanged: {
         first = 1;
         last = frameCount;
         playhead = 1;
     }
 
-    readonly property int fps: Math.max(1, Math.round(baseFps / step))
+    readonly property int fps: Math.max(1, Math.round(baseFps / step * speed))
     readonly property int keptFrames: Math.floor((last - first) / step) + 1
     readonly property real seconds: keptFrames / fps
 
@@ -196,6 +206,7 @@ Item {
                     + "  ·  " + panel.fps + " fps"
                     + "  ·  " + panel.seconds.toFixed(1) + "s"
                     + (panel.step > 1 ? "  ·  1/" + panel.step : "")
+                    + (panel.speed !== 1 ? "  ·  " + panel.speed + "×" : "")
             }
 
             // Scrub track: the kept range is highlighted, the two handles set it,
@@ -315,6 +326,13 @@ Item {
                     onClicked: panel.step = panel.step >= 4 ? 1 : panel.step * 2
                 }
 
+                TextButton {
+                    label: I18n.tr("gif.speed", { n: panel.speed })
+                    enabled: panel.busy === ""
+                    onClicked: panel.speedIndex =
+                        (panel.speedIndex + 1) % panel.speeds.length
+                }
+
                 Item { Layout.fillWidth: true }
 
                 Text {
@@ -332,16 +350,16 @@ Item {
                 }
 
                 TextButton {
-                    label: I18n.tr("gif.save_gif")
+                    label: I18n.tr("gif.copy_gif")
                     enabled: panel.busy === ""
-                    onClicked: panel.saveGif(panel.first, panel.last, panel.step, panel.fps)
+                    onClicked: panel.copyGif(panel.first, panel.last, panel.step, panel.fps)
                 }
 
                 TextButton {
-                    label: I18n.tr("gif.copy_gif")
+                    label: I18n.tr("gif.save_mp4")
                     primary: true
                     enabled: panel.busy === ""
-                    onClicked: panel.copyGif(panel.first, panel.last, panel.step, panel.fps)
+                    onClicked: panel.saveMp4(panel.first, panel.last, panel.step, panel.fps)
                 }
 
                 IconButton {
