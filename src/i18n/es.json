@@ -75,5 +75,6 @@
   "notify.record_no_frames": "la grabación no produjo fotogramas",
   "notify.recording_copied": "Grabación copiada",
   "notify.recording_saved": "Grabación guardada",
-  "tooltip.record": "Grabar"
+  "tooltip.record": "Grabar",
+  "gif.window_title": "rishot — grabación"
 }

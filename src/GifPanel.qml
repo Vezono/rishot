@@ -94,27 +94,22 @@ Item {
     Rectangle {
         id: card
         anchors.fill: parent
-        radius: 12
         color: Theme.panelBg
-        border.color: Theme.panelBorder
-        border.width: 1
-        // Fixed, not content-sized: the frame count and duration in the info
-        // line change on every scrub, and a card that resized with them would
-        // jitter under the cursor.
         implicitWidth: 560
         implicitHeight: col.implicitHeight + 28
 
         ColumnLayout {
             id: col
-            anchors.centerIn: parent
-            width: parent.width - 28
+            anchors.fill: parent
+            anchors.margins: 14
             spacing: 12
 
             // Preview. The frame files are numbered from 1, five digits wide,
             // the way rishot-record writes them.
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 300
+                Layout.fillHeight: true
+                Layout.minimumHeight: 160
                 radius: 8
                 color: Theme.dim
                 clip: true

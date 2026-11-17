@@ -1029,6 +1029,7 @@ ShellRoot {
     readonly property bool recPassThrough:
         recPhase === "recording" || recPhase === "paused" || recPhase === "processing"
     readonly property bool recActive: recPhase !== "" && recPhase !== "armed"
+    readonly property bool recReview: recPhase === "review"
 
     /** Frames are unpacked at this rate; the panel thins it from there. */
     readonly property int gifFps: {
@@ -1319,6 +1320,59 @@ ShellRoot {
         }
     }
 
+    /**
+     * The review panel is a toplevel, not part of the overlay. It is a window
+     * you work in rather than something laid over the screen, so the compositor
+     * should place, size, focus and tile it like any other window, and the user
+     * gets the move, resize and close they already know.
+     */
+    FloatingWindow {
+        id: reviewWindow
+        visible: root.recReview
+        title: I18n.tr("gif.window_title")
+        color: Theme.panelBg
+        implicitWidth: 820
+        implicitHeight: 640
+
+        /**
+         * There is no "please float me" in xdg-shell, so a tiling compositor
+         * has to be told sideways. The dwl family, mango included, decides at
+         * map time in client_is_float_type: a toplevel floats when it has a
+         * parent, or when its minimum size equals its maximum size. So the
+         * window maps fixed at its opening size, which satisfies that test,
+         * and relaxes the bounds once it is up so it can still be resized -
+         * the flag is only read at map, never re-evaluated. Compositors that
+         * ignore the hint just tile it as they did before.
+         */
+        property bool sizeRelaxed: false
+        minimumSize: sizeRelaxed ? Qt.size(460, 420) : Qt.size(820, 640)
+        maximumSize: sizeRelaxed ? Qt.size(8192, 8192) : Qt.size(820, 640)
+
+        onVisibleChanged: if (visible) relaxTimer.restart()
+
+        Timer {
+            id: relaxTimer
+            interval: 150
+            onTriggered: reviewWindow.sizeRelaxed = true
+        }
+
+        GifPanel {
+            anchors.fill: parent
+            focus: true
+            frameDir: root.recFrameDir
+            frameCount: root.recFrameCount
+            baseFps: root.gifFps
+            busy: root.recBusy
+
+            Keys.onEscapePressed: { root.recSweep(); Qt.quit(); }
+
+            onCopyGif: (first, last, step, fps) => root.recExport("gif-copy", first, last, step, fps)
+            onCopyMp4: (first, last, step, fps) => root.recExport("mp4-copy", first, last, step, fps)
+            onSaveGif: (first, last, step, fps) => root.recExport("gif-save", first, last, step, fps)
+            onCancel: { root.recSweep(); Qt.quit(); }
+        }
+    }
+
     function toolbarFor(win) {
         // Recording hides the annotation toolbar wherever it was started from:
         // it sits over the selection and would be in the video.
@@ -1335,7 +1389,10 @@ ShellRoot {
             id: win
             required property var modelData
             screen: modelData
-            visible: !root.dialogMode
+            // Unmapped while the review window is up, for the same reason
+            // dialogMode unmaps it for kdialog: a layer surface holding an
+            // exclusive keyboard grab would never let the toplevel have focus.
+            visible: !root.dialogMode && !root.recReview
                 && (root.captureBackend !== "image" || root.frozenSource !== "")
 
             anchors { top: true; left: true; right: true; bottom: true }
@@ -1657,28 +1714,6 @@ ShellRoot {
                     onCancel: Qt.quit()
                 }
 
-                // The review panel replaces the overlay rather than sitting on
-                // it, so it brings its own backdrop.
-                Rectangle {
-                    visible: root.recPhase === "review" && root.anchorOverlay() === win
-                    anchors.fill: parent
-                    color: Theme.dim
-                }
-
-                GifPanel {
-                    id: gifPanel
-                    visible: root.recPhase === "review" && root.anchorOverlay() === win
-                    anchors.centerIn: parent
-                    frameDir: root.recFrameDir
-                    frameCount: root.recFrameCount
-                    baseFps: root.gifFps
-                    busy: root.recBusy
-
-                    onCopyGif: (first, last, step, fps) => root.recExport("gif-copy", first, last, step, fps)
-                    onCopyMp4: (first, last, step, fps) => root.recExport("mp4-copy", first, last, step, fps)
-                    onSaveGif: (first, last, step, fps) => root.recExport("gif-save", first, last, step, fps)
-                    onCancel: { root.recSweep(); Qt.quit(); }
-                }
 
             }
 

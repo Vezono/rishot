@@ -75,5 +75,6 @@
   "notify.record_no_frames": "the recording produced no frames",
   "notify.recording_copied": "Recording copied",
   "notify.recording_saved": "Recording saved",
-  "tooltip.record": "Record"
+  "tooltip.record": "Record",
+  "gif.window_title": "rishot — recording"
 }
