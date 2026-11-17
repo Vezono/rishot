@@ -16,6 +16,8 @@ Item {
     property bool settingsOpen: false
     property bool hasOcr: false
     property bool hasQr: false
+    /** False when no screen recorder is installed, which hides the record button. */
+    property bool hasRecorder: false
 
     readonly property real gearCenterX: gear.x + row.x + gear.width / 2
     readonly property real colorCenterX: colorBtn.x + row.x + colorBtn.width / 2
@@ -32,6 +34,7 @@ Item {
     signal uploadRequested()
     signal ocrRequested()
     signal qrRequested()
+    signal recordRequested()
     signal settingsRequested()
 
     /**
@@ -354,6 +357,18 @@ Item {
                     onHoveredChanged: hovered
                         ? tb.showTip(I18n.tr("tooltip.qr"), "Ctrl+R", qrBtn.x + row.x + qrBtn.width / 2)
                         : tb.hideTip(I18n.tr("tooltip.qr"))
+                }
+            }
+
+            IconButton {
+                id: recordBtn
+                visible: tb.hasRecorder
+                icon: "record"
+                onClicked: tb.recordRequested()
+                HoverHandler {
+                    onHoveredChanged: hovered
+                        ? tb.showTip(I18n.tr("tooltip.record"), "Ctrl+G", recordBtn.x + row.x + recordBtn.width / 2)
+                        : tb.hideTip(I18n.tr("tooltip.record"))
                 }
             }
 

@@ -74,5 +74,6 @@
   "notify.no_recorder_body": "el modo gif necesita wf-recorder o wl-screenrec",
   "notify.record_no_frames": "la grabación no produjo fotogramas",
   "notify.recording_copied": "Grabación copiada",
-  "notify.recording_saved": "Grabación guardada"
+  "notify.recording_saved": "Grabación guardada",
+  "tooltip.record": "Grabar"
 }

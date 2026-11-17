@@ -69,7 +69,7 @@ Quickshell is in the official repos on Arch (extra), Fedora 44+, Void, and Debia
 - Scroll while drawing to resize the stroke or text live
 - Per-tool memory: each tool keeps its own colour, width and fill, saved across launches
 - Undo and redo, copy, save, upload
-- Record a region as a gif or mp4 with `rishot gif`: pause and resume while recording, then trim,
+- Record a region as a gif or mp4, from the toolbar's record button (`Ctrl+G`) or straight into it with `rishot gif`: pause and resume while recording, then trim,
   thin the frame rate and preview before copying or saving (needs `wl-screenrec` or `wf-recorder`,
   plus `ffmpeg`; `gifski` makes better gifs when it is installed)
 - Copy the text in a shot with OCR (`Ctrl+T`, needs `tesseract`)

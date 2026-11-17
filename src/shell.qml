@@ -1128,13 +1128,17 @@ ShellRoot {
     Process {
         id: recToolProbe
         stdout: StdioCollector { id: recToolOut }
-        running: root.mode === "gif"
+        // Runs in every mode: the toolbar's record button is hidden when no
+        // recorder is installed, the same way the OCR and QR buttons are.
+        running: true
         command: ["sh", "-c",
             "for t in wl-screenrec wf-recorder; do "
             + "command -v \"$t\" >/dev/null 2>&1 && { printf '%s' \"$t\"; exit 0; }; done"]
         onExited: {
             root.recTool = recToolOut.text.trim();
-            if (root.recTool === "") root.recFail(I18n.tr("notify.no_recorder_body"));
+            // Only gif mode has nothing else to offer when there is no recorder.
+            if (root.recTool === "" && root.mode === "gif")
+                root.recFail(I18n.tr("notify.no_recorder_body"));
         }
     }
 
@@ -1279,7 +1283,9 @@ ShellRoot {
     }
 
     function toolbarFor(win) {
-        if (mode === "gif") return { visible: false, x: 0, y: 0 };
+        // Recording hides the annotation toolbar wherever it was started from:
+        // it sits over the selection and would be in the video.
+        if (mode === "gif" || recActive) return { visible: false, x: 0, y: 0 };
         if (phase !== "editing" || !globalSel || outFile !== "") return { visible: false, x: 0, y: 0 };
         if (anchorOverlay() !== win) return { visible: false, x: 0, y: 0 };
         return { visible: true };
@@ -1389,6 +1395,7 @@ ShellRoot {
                         else if (e.key === Qt.Key_U) { if (root.phase === "editing") root.doUpload(); e.accepted = true; }
                         else if (e.key === Qt.Key_T) { if (root.phase === "editing" && root.hasOcr) root.doOcr(); e.accepted = true; }
                         else if (e.key === Qt.Key_R) { if (root.phase === "editing" && root.hasQr) root.doQr(); e.accepted = true; }
+                        else if (e.key === Qt.Key_G) { if (root.phase === "editing" && root.recTool !== "") root.recStart(); e.accepted = true; }
                         else if (e.key === Qt.Key_Z) { root.undo(); e.accepted = true; }
                         else if (e.key === Qt.Key_Y) { root.redo(); e.accepted = true; }
                         return;
@@ -1484,6 +1491,7 @@ ShellRoot {
                     settingsOpen: root.settingsOpen
                     hasOcr: root.hasOcr
                     hasQr: root.hasQr
+                    hasRecorder: root.recTool !== ""
 
                     x: {
                         if (!win.selLocal) return 0;
@@ -1508,6 +1516,7 @@ ShellRoot {
                     onUploadRequested: root.doUpload()
                     onOcrRequested: root.doOcr()
                     onQrRequested: root.doQr()
+                    onRecordRequested: root.recStart()
                     onSettingsRequested: { root.openPopover = ""; root.settingsOpen = !root.settingsOpen; }
                     onDragMoved: (dx, dy) => {
                         if (!win.selLocal) return;
@@ -1563,8 +1572,9 @@ ShellRoot {
 
                 RecordBar {
                     id: recordBar
-                    visible: root.mode === "gif"
-                        && root.recPhase !== "" && root.recPhase !== "review"
+                    // Not gated on gif mode: the toolbar's record button
+                    // starts the same flow from an ordinary region selection.
+                    visible: root.recPhase !== "" && root.recPhase !== "review"
                         && win.selLocal !== null
                         && root.anchorOverlay() === win
                     phase: root.recPhase
