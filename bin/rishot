@@ -38,6 +38,8 @@ msg() {
 	*:unknown_argument) printf 'unknown argument: %s' "$2" ;;
 	es:needs_tool) printf '%s necesita %s' "--$2" "$3" ;;
 	*:needs_tool) printf '%s needs %s' "--$2" "$3" ;;
+	es:gif_no_output) printf 'el modo gif no admite %s' "--$2" ;;
+	*:gif_no_output) printf 'gif mode does not support %s' "--$2" ;;
 	es:no_config_dir) printf 'no se pudo localizar el directorio de configuración (define RISHOT_CONFIG_DIR)' ;;
 	*:no_config_dir) printf 'could not locate the config dir (set RISHOT_CONFIG_DIR)' ;;
 	es:no_qs) printf "'qs' (quickshell) no está en PATH" ;;
@@ -74,6 +76,7 @@ uso: rishot [modo] [--clipboard | --raw | --text | --qr]
 modos:
   (ninguno), region    arrastra una región, o haz clic en una ventana o en el escritorio para capturar esa zona (predeterminado)
   monitor              haz clic en un monitor para capturar la salida completa
+  gif                  arrastra una región y grábala, luego recórtala y cópiala como gif o mp4
 
 opciones:
   -c, --clipboard      omite el editor y copia el PNG al portapapeles
@@ -90,6 +93,7 @@ entorno:
   RISHOT_UPLOAD        cambia el destino de subida (objetivo https form-post)
   RISHOT_SAVEDIR       cambia el directorio de guardado automático
   RISHOT_KEYBIND_FILE  escribe aquí el atajo reasignado en la aplicación en vez de autodetectarlo
+  RISHOT_GIF_FPS       fotogramas por segundo al desempaquetar una grabación (predeterminado 20)
 EOF
 	else
 		cat <<'EOF'
@@ -100,6 +104,7 @@ usage: rishot [mode] [--clipboard | --raw | --text | --qr]
 modes:
   (none), region   drag a region, or click a window or the desktop to grab it (default)
   monitor          click a monitor to grab the whole output
+  gif              drag a region and record it, then trim and copy a gif or mp4
 
 options:
   -c, --clipboard  skip the editor, copy the PNG to the clipboard
@@ -116,6 +121,7 @@ env:
   RISHOT_UPLOAD      override the upload endpoint (https form-post target)
   RISHOT_SAVEDIR     override the auto-save directory
   RISHOT_KEYBIND_FILE  write the in-app rebind here instead of autodetecting
+  RISHOT_GIF_FPS       frame rate gif mode unpacks a recording at (default 20)
 EOF
 	fi
 }
@@ -133,6 +139,7 @@ for arg; do
 	case "$arg" in
 		monitor | --monitor | -m) mode=monitor ;;
 		region | --region | -r) mode=region ;;
+		gif | --gif | -g) mode=gif ;;
 		--clipboard | -c) output=clipboard ;;
 		--raw) output=raw ;;
 		--text) output=text; need=tesseract ;;
@@ -141,6 +148,13 @@ for arg; do
 		*) err unknown_argument "$arg"; usage >&2; exit 2 ;;
 	esac
 done
+
+# The --clipboard/--raw/--text/--qr paths all hand back a single PNG, which a
+# recording has no equivalent of; gif mode always opens its review panel.
+if [ "$mode" = gif ] && [ -n "$output" ]; then
+	err gif_no_output "$output"
+	exit 2
+fi
 
 if [ -n "$need" ] && ! command -v "$need" >/dev/null 2>&1; then
 	err needs_tool "$output" "$need"
@@ -172,6 +186,19 @@ command -v qs >/dev/null 2>&1 || {
 	err no_qs
 	exit 1
 }
+
+# The ffmpeg side of gif mode. It sits beside this launcher in a checkout and on
+# PATH after an install, so prefer the neighbour for the same reason the config
+# dir does: a checkout should run its own code.
+if [ -z "${RISHOT_RECORD_HELPER:-}" ]; then
+	helper_dir=$(dirname "$(readlink -f "$0")")
+	if [ -x "$helper_dir/rishot-record" ]; then
+		RISHOT_RECORD_HELPER="$helper_dir/rishot-record"
+	else
+		RISHOT_RECORD_HELPER=rishot-record
+	fi
+	export RISHOT_RECORD_HELPER
+fi
 
 # Single instance: a second press replaces the open overlay. The lock
 # is held on fd 9 for the lifetime of qs; clipboard daemons that qs spawns close

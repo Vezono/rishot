@@ -61,5 +61,18 @@
   "notify.upload_link_copied": "Enlace copiado",
   "notify.upload_failed": "Error al subir",
   "notify.open_action": "Abrir",
-  "notify.copy_link_action": "Copiar enlace"
+  "notify.copy_link_action": "Copiar enlace",
+  "gif.record": "Grabar",
+  "gif.processing": "Procesando…",
+  "gif.frames": "{n} fotogramas",
+  "gif.halve": "½ fotogramas",
+  "gif.exporting": "Exportando…",
+  "gif.copy_gif": "Copiar GIF",
+  "gif.copy_mp4": "Copiar MP4",
+  "gif.save_gif": "Guardar GIF",
+  "notify.record_failed": "La grabación falló",
+  "notify.no_recorder_body": "el modo gif necesita wf-recorder o wl-screenrec",
+  "notify.record_no_frames": "la grabación no produjo fotogramas",
+  "notify.recording_copied": "Grabación copiada",
+  "notify.recording_saved": "Grabación guardada"
 }

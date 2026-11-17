@@ -14,7 +14,11 @@ optdepends=('imagemagick: stitch a multi-monitor capture into one image'
             'kdialog: native save-as file dialog'
             'libnotify: desktop notification when a shot is copied, saved or uploaded'
             'tesseract: copy the text in a shot (OCR)'
-            'zbar: copy the QR codes and barcodes in a shot')
+            'zbar: copy the QR codes and barcodes in a shot'
+            'ffmpeg: record a region as a gif or mp4 with rishot gif'
+            'wl-screenrec: screen recorder for rishot gif'
+            'wf-recorder: screen recorder for rishot gif, alternative to wl-screenrec'
+            'gifski: better gif encoding than the ffmpeg palette fallback')
 provides=('rishot')
 conflicts=('rishot')
 makedepends=('git')
@@ -41,6 +45,7 @@ package() {
 	done
 
 	install -Dm755 bin/rishot "$pkgdir/usr/bin/rishot"
+	install -Dm755 bin/rishot-record "$pkgdir/usr/bin/rishot-record"
 	install -Dm644 rishot.desktop "$pkgdir/usr/share/applications/rishot.desktop"
 	install -Dm644 packaging/rishot.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/rishot.svg"
 

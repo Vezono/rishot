@@ -1,0 +1,188 @@
+#!/bin/sh
+# rishot-record - the ffmpeg side of rishot's gif mode.
+#
+# The overlay drives wf-recorder itself (it needs the pid to pause by signal),
+# and calls this for everything after: joining the paused segments, unpacking
+# the result to frames, and writing the trimmed gif or mp4 back out.
+#
+# Subcommands, all of which print nothing but their one result line:
+#
+#   join   <segdir> <out.mkv>                        -> out path
+#   frames <in.mkv> <fps> <framedir>                 -> frame count
+#   gif    <framedir> <first> <last> <step> <fps> <out>  -> out path
+#   mp4    <framedir> <first> <last> <step> <fps> <out>  -> out path
+#
+# first/last are 1-based inclusive frame numbers and step takes every Nth frame
+# from first, so halving the frame count is step=2 with fps halved to match.
+# Working files live under the cache dir, never XDG_RUNTIME_DIR: that is tmpfs
+# on most systems and a few thousand PNGs of a large region would be RAM.
+
+set -eu
+
+PROG=${0##*/}
+
+die() { printf '%s: %s\n' "$PROG" "$*" >&2; exit 1; }
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# A long recording unpacks to a frame set that is slow to work with and large on
+# disk, so the extraction refuses rather than quietly filling the cache. The
+# overlay turns this exit into "recording too long for a gif".
+MAX_FRAMES=${RISHOT_GIF_MAXFRAMES:-3000}
+
+have ffmpeg || die "ffmpeg is required for gif mode"
+
+# ffmpeg talks a lot; keep the chatter unless something fails, in which case the
+# caller wants the real error. -nostdin stops it eating the overlay's stdin.
+ff() {
+	ffmpeg -nostdin -hide_banner -loglevel error -y "$@"
+}
+
+# The concat demuxer takes an explicit per-frame duration, which is the only way
+# to hold an arbitrary subset (trim plus every-Nth) at an exact frame rate. Paths
+# are quoted the way the demuxer expects: single quotes, doubled inside.
+frame_list() {
+	framedir=$1
+	first=$2
+	last=$3
+	step=$4
+	fps=$5
+	list=$6
+
+	dur=$(awk -v f="$fps" 'BEGIN { printf "%.6f", 1 / f }')
+	: > "$list"
+	n=0
+	i=$first
+	while [ "$i" -le "$last" ]; do
+		f=$(printf '%s/f_%05d.png' "$framedir" "$i")
+		if [ -f "$f" ]; then
+			printf "file '%s'\nduration %s\n" "$(printf '%s' "$f" | sed "s/'/'\\\\''/g")" "$dur" >> "$list"
+			n=$((n + 1))
+		fi
+		i=$((i + step))
+	done
+	# The demuxer drops the last entry's duration, so the final frame is repeated
+	# to give it one; without this the gif ends one frame short.
+	[ "$n" -gt 0 ] || die "no frames in range $first-$last"
+	printf "file '%s'\n" "$(printf '%s' "$f" | sed "s/'/'\\\\''/g")" >> "$list"
+	printf '%s' "$n"
+}
+
+cmd_join() {
+	segdir=${1:-}
+	out=${2:-}
+	[ -n "$segdir" ] && [ -n "$out" ] || die "usage: $PROG join <segdir> <out.mkv>"
+	[ -d "$segdir" ] || die "no such segment dir: $segdir"
+
+	list="$segdir/segments.txt"
+	: > "$list"
+	count=0
+	for seg in "$segdir"/seg_*.mkv; do
+		[ -f "$seg" ] || continue
+		# A segment cut short by a kill can end mid-frame; ffprobe tells us
+		# whether it holds a decodable stream before we try to join it.
+		if ffprobe -v error -select_streams v:0 -show_entries stream=codec_type \
+			-of csv=p=0 "$seg" >/dev/null 2>&1; then
+			printf "file '%s'\n" "$(printf '%s' "$seg" | sed "s/'/'\\\\''/g")" >> "$list"
+			count=$((count + 1))
+		fi
+	done
+	[ "$count" -gt 0 ] || die "no usable segments in $segdir"
+
+	if [ "$count" = 1 ]; then
+		# One segment: nothing to join, so skip a whole copy of the file.
+		seg=$(sed -n "1s/^file '\(.*\)'$/\1/p" "$list")
+		mv "$seg" "$out"
+	else
+		ff -f concat -safe 0 -i "$list" -c copy "$out" \
+			|| die "could not join the recording segments"
+	fi
+	printf '%s' "$out"
+}
+
+cmd_frames() {
+	src=${1:-}
+	fps=${2:-}
+	framedir=${3:-}
+	[ -n "$src" ] && [ -n "$fps" ] && [ -n "$framedir" ] \
+		|| die "usage: $PROG frames <in.mkv> <fps> <framedir>"
+	[ -f "$src" ] || die "no such recording: $src"
+
+	# Refuse before extracting, not after: duration times fps is the frame count.
+	secs=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$src" 2>/dev/null || echo 0)
+	want=$(awk -v s="$secs" -v f="$fps" 'BEGIN { printf "%d", s * f }')
+	if [ "$want" -gt "$MAX_FRAMES" ]; then
+		die "recording is too long for a gif: ${want} frames at ${fps}fps (limit $MAX_FRAMES)"
+	fi
+
+	rm -rf "$framedir"
+	mkdir -p "$framedir"
+	ff -i "$src" -vf "fps=$fps" "$framedir/f_%05d.png" \
+		|| die "could not unpack the recording into frames"
+
+	n=$(find "$framedir" -name 'f_*.png' -type f | wc -l)
+	[ "$n" -gt 0 ] || die "the recording produced no frames"
+	printf '%s' "$n"
+}
+
+cmd_gif() {
+	[ $# -eq 6 ] || die "usage: $PROG gif <framedir> <first> <last> <step> <fps> <out>"
+	framedir=$1; first=$2; last=$3; step=$4; fps=$5; out=$6
+	[ -d "$framedir" ] || die "no such frame dir: $framedir"
+
+	list="$framedir/gif.txt"
+	frame_list "$framedir" "$first" "$last" "$step" "$fps" "$list" >/dev/null
+
+	if have gifski; then
+		# gifski quantises per frame, which holds up far better than a single
+		# global palette on gradients and video. It takes the files directly.
+		set --
+		i=$first
+		while [ "$i" -le "$last" ]; do
+			f=$(printf '%s/f_%05d.png' "$framedir" "$i")
+			[ -f "$f" ] && set -- "$@" "$f"
+			i=$((i + step))
+		done
+		gifski --quiet --fps "$fps" -o "$out" "$@" \
+			|| die "gifski could not write the gif"
+	else
+		# Two-pass palette: stats_mode=diff weights the moving part of the
+		# frame, which is what a screen recording mostly is.
+		pal="$framedir/palette.png"
+		ff -f concat -safe 0 -i "$list" -vf "palettegen=stats_mode=diff" "$pal" \
+			|| die "could not build a gif palette"
+		ff -f concat -safe 0 -i "$list" -i "$pal" \
+			-lavfi "paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle" \
+			-loop 0 "$out" \
+			|| die "could not write the gif"
+	fi
+	printf '%s' "$out"
+}
+
+cmd_mp4() {
+	[ $# -eq 6 ] || die "usage: $PROG mp4 <framedir> <first> <last> <step> <fps> <out>"
+	framedir=$1; first=$2; last=$3; step=$4; fps=$5; out=$6
+	[ -d "$framedir" ] || die "no such frame dir: $framedir"
+
+	list="$framedir/mp4.txt"
+	frame_list "$framedir" "$first" "$last" "$step" "$fps" "$list" >/dev/null
+
+	# yuv420p needs even dimensions and a dragged region is any size, so round
+	# down rather than let the encoder refuse.
+	ff -f concat -safe 0 -i "$list" \
+		-vf "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p" \
+		-c:v libx264 -preset veryfast -crf 20 -movflags +faststart \
+		-r "$fps" "$out" \
+		|| die "could not write the mp4"
+	printf '%s' "$out"
+}
+
+[ $# -gt 0 ] || die "usage: $PROG <join|frames|gif|mp4> ..."
+sub=$1
+shift
+case "$sub" in
+join) cmd_join "$@" ;;
+frames) cmd_frames "$@" ;;
+gif) cmd_gif "$@" ;;
+mp4) cmd_mp4 "$@" ;;
+*) die "unknown subcommand: $sub" ;;
+esac

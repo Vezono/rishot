@@ -54,6 +54,7 @@ print_manual_deps() {
 	say "Install these yourself, then re-run:"
 	say "  required: quickshell, wl-clipboard, qt6-declarative, qt6-svg, qt6-5compat, qt6-wayland"
 	say "  optional: imagemagick, cliphist, curl, kdialog, libnotify"
+	say "  for 'rishot gif': ffmpeg plus wl-screenrec or wf-recorder (gifski optional)"
 	say "  on KDE/KWin: spectacle (rishot captures through it; KWin has no screencopy protocol)"
 	say "quickshell lives in: Arch extra, Debian/Ubuntu, Fedora COPR errornointernet/quickshell, NixOS, Void."
 }
@@ -255,6 +256,10 @@ install_files() {
 	[ -f "$PREFIX/src/shell.qml" ] || die "install looks wrong: $PREFIX/src/shell.qml missing"
 	chmod 755 "$PREFIX/bin/rishot"
 	ln -sf "$PREFIX/bin/rishot" "$BINDIR/rishot"
+
+	# gif mode's ffmpeg helper. It stays beside the launcher rather than on PATH:
+	# rishot resolves it through its own symlink, so one link is enough.
+	[ -f "$PREFIX/bin/rishot-record" ] && chmod 755 "$PREFIX/bin/rishot-record"
 
 	# Desktop entry + icon so rishot shows up in app launchers.
 	datadir="${XDG_DATA_HOME:-$HOME/.local/share}"

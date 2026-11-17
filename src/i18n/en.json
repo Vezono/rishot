@@ -61,5 +61,18 @@
   "notify.upload_link_copied": "Link copied",
   "notify.upload_failed": "Upload failed",
   "notify.open_action": "Open",
-  "notify.copy_link_action": "Copy link"
+  "notify.copy_link_action": "Copy link",
+  "gif.record": "Record",
+  "gif.processing": "Processing…",
+  "gif.frames": "{n} frames",
+  "gif.halve": "½ frames",
+  "gif.exporting": "Exporting…",
+  "gif.copy_gif": "Copy GIF",
+  "gif.copy_mp4": "Copy MP4",
+  "gif.save_gif": "Save GIF",
+  "notify.record_failed": "Recording failed",
+  "notify.no_recorder_body": "gif mode needs wf-recorder or wl-screenrec",
+  "notify.record_no_frames": "the recording produced no frames",
+  "notify.recording_copied": "Recording copied",
+  "notify.recording_saved": "Recording saved"
 }

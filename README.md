@@ -69,6 +69,9 @@ Quickshell is in the official repos on Arch (extra), Fedora 44+, Void, and Debia
 - Scroll while drawing to resize the stroke or text live
 - Per-tool memory: each tool keeps its own colour, width and fill, saved across launches
 - Undo and redo, copy, save, upload
+- Record a region as a gif or mp4 with `rishot gif`: pause and resume while recording, then trim,
+  thin the frame rate and preview before copying or saving (needs `wl-screenrec` or `wf-recorder`,
+  plus `ffmpeg`; `gifski` makes better gifs when it is installed)
 - Copy the text in a shot with OCR (`Ctrl+T`, needs `tesseract`)
 - Copy every QR code and barcode in a shot (`Ctrl+R`, needs `zbar`)
 - Skip the editor: `rishot --clipboard` copies the shot, `rishot --raw` writes the PNG to stdout, `rishot --text` and `rishot --qr` copy and print the text or codes
@@ -97,7 +100,8 @@ hl.bind("Print", hl.dsp.exec_cmd("rishot"))        # Hyprland (lua)
 bindsym Print exec rishot                          # Sway
 ```
 
-Run `rishot` for region, window, or the monitor under a desktop click, `rishot monitor` for a whole output. Add `--clipboard` to copy the shot without opening the editor, `--raw` to write the PNG to stdout, `--text` or `--qr` to copy and print the text or codes in it:
+Run `rishot` for region, window, or the monitor under a desktop click, `rishot monitor` for a whole output,
+`rishot gif` to record a region instead of grabbing one. Add `--clipboard` to copy the shot without opening the editor, `--raw` to write the PNG to stdout, `--text` or `--qr` to copy and print the text or codes in it:
 
 ```sh
 rishot --clipboard
@@ -112,6 +116,8 @@ All four exit 1 when the capture is cancelled or fails, `--text` and `--qr` also
 Required: `quickshell` (the `qs` binary), Qt 6 (declarative, svg, 5compat, wayland), `wl-clipboard`.
 
 Optional: `imagemagick` (multi-monitor stitch), `cliphist` (clip history), `curl` (upload), `kdialog` (save dialog and folder picker), `libnotify` (a desktop notification when a shot is copied, saved or uploaded), `tesseract` plus a language pack (OCR; reads with every installed language), `zbar` (QR codes and barcodes).
+
+For `rishot gif`: `ffmpeg`, and one of `wl-screenrec` (preferred, lighter) or `wf-recorder`. `gifski` is optional and produces noticeably better gifs than the ffmpeg palette fallback. Gif mode is wlroots-only for the same reason window-click is: KWin speaks no screencopy protocol, and neither recorder works there.
 
 On KDE: `spectacle`, which rishot captures through since KWin has no screencopy protocol. The installer pulls it in when it sees a KDE session.
 

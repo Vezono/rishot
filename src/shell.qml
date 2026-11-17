@@ -161,7 +161,12 @@ ShellRoot {
     property var overlays: []
     property int captureFails: 0
 
-    readonly property string mode: Quickshell.env("RISHOT_MODE") === "monitor" ? "monitor" : "region"
+    readonly property string mode: {
+        var m = Quickshell.env("RISHOT_MODE");
+        if (m === "monitor") return "monitor";
+        if (m === "gif") return "gif";
+        return "region";
+    }
     readonly property string homeDir: Quickshell.env("HOME") || "/tmp"
     readonly property string tmpDir: Quickshell.env("XDG_RUNTIME_DIR") || "/tmp"
     readonly property string shotsDir: Quickshell.env("RISHOT_SAVEDIR")
@@ -257,6 +262,9 @@ ShellRoot {
             phase = "editing";
             hoverWindow = null;
         } else globalSel = null;
+        // gif mode has no annotation step: a finished selection is a rect
+        // waiting to be recorded, so it arms the record bar instead.
+        if (mode === "gif" && phase === "editing") recPhase = "armed";
     }
 
     /**
@@ -503,11 +511,13 @@ ShellRoot {
         else endDraw();
     }
 
-    function timestampName() {
+    /** Dated basename. Defaults to a png shot; gif mode passes its own stem and extension. */
+    function timestampName(stem, ext) {
         var d = new Date();
         function p(n) { return (n < 10 ? "0" : "") + n; }
-        return "shot-" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate())
-            + "-" + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()) + ".png";
+        return (stem || "shot") + "-" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate())
+            + "-" + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds())
+            + "." + (ext || "png");
     }
     /** Save target: the folder picked in settings, or shotsDir when none is set. */
     readonly property string effectiveSaveDir: Config.saveDir !== "" ? Config.saveDir : shotsDir
@@ -985,7 +995,291 @@ ShellRoot {
         onExited: () => { var f = cb; cb = null; if (f) f(); }
     }
 
+    /* ---------------------------------------------------------------- gif mode
+     *
+     * Recording is the one flow that cannot live on the frozen frame: the
+     * overlay has to get out of the way so the user can drive the app being
+     * recorded. So once armed, the overlay stops drawing and gives up the
+     * keyboard, and its input region shrinks to the control bar (recPassThrough
+     * below). The bar is placed outside the recorded rect, because wf-recorder
+     * captures the compositor's output and anything over the rect would land in
+     * the video.
+     *
+     * Pause is segments, not a signal: no recorder can pause a stream, and
+     * SIGSTOP would leave a frozen stretch the length of the pause. Each
+     * pause ends a segment and each resume starts the next, and rishot-record
+     * joins them when recording stops.
+     */
+
+    /** "" | armed | recording | paused | processing | review */
+    property string recPhase: ""
+    property int recSegment: 0
+    property int recElapsed: 0
+    property real recBase: 0
+    property real recSegT0: 0
+    property bool recStopping: false
+    property string recTool: ""
+    property string recJoined: ""
+    property int recFrameCount: 0
+    property string recBusy: ""
+    property string recExportPath: ""
+    property real recBarDX: 0
+    property real recBarDY: 0
+
+    readonly property bool recPassThrough:
+        recPhase === "recording" || recPhase === "paused" || recPhase === "processing"
+    readonly property bool recActive: recPhase !== "" && recPhase !== "armed"
+
+    /** Frames are unpacked at this rate; the panel thins it from there. */
+    readonly property int gifFps: {
+        var v = parseInt(Quickshell.env("RISHOT_GIF_FPS") || "", 10);
+        return (v > 0 && v <= 60) ? v : 20;
+    }
+
+    /**
+     * Working files go in the cache dir, not XDG_RUNTIME_DIR: that is tmpfs on
+     * most systems and a few thousand frame PNGs would be held in RAM.
+     */
+    readonly property string recRoot: (Quickshell.env("XDG_CACHE_HOME")
+        || (homeDir + "/.cache")) + "/rishot/record"
+    readonly property string recSegDir: recRoot + "/segs"
+    readonly property string recFrameDir: recRoot + "/frames"
+    readonly property string recHelper: Quickshell.env("RISHOT_RECORD_HELPER") || "rishot-record"
+
+    /**
+     * Geometry for the recorder, in output-layout coordinates. Width and height
+     * are rounded down to even numbers because libx264 cannot encode an odd
+     * dimension in yuv420p and a dragged region is any size at all.
+     */
+    function recGeometry() {
+        if (!globalSel) return "";
+        var w = Math.max(2, Math.floor(globalSel.w / 2) * 2);
+        var h = Math.max(2, Math.floor(globalSel.h / 2) * 2);
+        return Math.round(globalSel.x) + "," + Math.round(globalSel.y) + " " + w + "x" + h;
+    }
+
+    function recStart() {
+        if (recTool === "") { recFail(I18n.tr("notify.no_recorder_body")); return; }
+        recSegment = 0;
+        recBase = 0;
+        recElapsed = 0;
+        recStopping = false;
+        mkdirProc.run(recSegDir, function () {
+            root.recPhase = "recording";
+            root.recSegT0 = Date.now();
+            recProc.start(root.recSegment);
+        });
+    }
+
+    function recPause() {
+        if (recPhase !== "recording") return;
+        recBase += Date.now() - recSegT0;
+        recElapsed = recBase;
+        recPhase = "paused";
+        recProc.signal(2);
+    }
+
+    function recResume() {
+        if (recPhase !== "paused") return;
+        recSegment += 1;
+        recPhase = "recording";
+        recSegT0 = Date.now();
+        recProc.start(recSegment);
+    }
+
+    function recStop() {
+        if (recPhase === "recording") {
+            recBase += Date.now() - recSegT0;
+            recElapsed = recBase;
+        }
+        recStopping = true;
+        if (recProc.running) {
+            recPhase = "processing";
+            recProc.signal(2);
+        } else {
+            recFinish();
+        }
+    }
+
+    /** Joins the segments, then unpacks them to frames for the review panel. */
+    function recFinish() {
+        recStopping = false;
+        recPhase = "processing";
+        joinProc.start();
+    }
+
+    function recFail(body) {
+        root.finish(I18n.tr("notify.record_failed"), body || "", true, "");
+    }
+
+    Timer {
+        interval: 100
+        repeat: true
+        running: root.recPhase === "recording"
+        onTriggered: root.recElapsed = root.recBase + (Date.now() - root.recSegT0)
+    }
+
+    /**
+     * Which recorder is present. wf-recorder is the reference; wl-screenrec
+     * takes the same -g and -f flags and is lighter, so it wins when both are
+     * installed. Neither one exists on KWin, which speaks no screencopy
+     * protocol at all, so gif mode is refused there before selection.
+     */
+    Process {
+        id: recToolProbe
+        stdout: StdioCollector { id: recToolOut }
+        running: root.mode === "gif"
+        command: ["sh", "-c",
+            "for t in wl-screenrec wf-recorder; do "
+            + "command -v \"$t\" >/dev/null 2>&1 && { printf '%s' \"$t\"; exit 0; }; done"]
+        onExited: {
+            root.recTool = recToolOut.text.trim();
+            if (root.recTool === "") root.recFail(I18n.tr("notify.no_recorder_body"));
+        }
+    }
+
+    /**
+     * One segment of the recording. fd 9 holds the single-instance lock (see
+     * bin/rishot) and this process outlives the launcher's own shell, so it
+     * closes the fd before exec'ing or a finished rishot would keep the lock.
+     * SIGINT, not SIGTERM: both recorders finalise the container on SIGINT.
+     */
+    Process {
+        id: recProc
+        function start(n) {
+            command = ["sh", "-c",
+                "exec 9>&-; exec \"$1\" -g \"$2\" -f \"$3\"",
+                "_", root.recTool, root.recGeometry(),
+                root.recSegDir + "/seg_" + String(n) + ".mkv"];
+            running = true;
+        }
+        onExited: (code) => {
+            // Also reached when the process object is torn down at quit, so the
+            // phase has to agree before this starts the post-processing chain.
+            if (!root.recStopping || root.recPhase !== "processing") return;
+            console.log("rishot: recorder segments done, last exit " + code);
+            root.recFinish();
+        }
+    }
+
+    Process {
+        id: joinProc
+        stdout: StdioCollector { id: joinOut }
+        stderr: StdioCollector { id: joinErr }
+        function start() {
+            command = [root.recHelper, "join", root.recSegDir, root.recRoot + "/all.mkv"];
+            running = true;
+        }
+        onExited: (code) => {
+            if (code !== 0) { root.recFail(joinErr.text.trim()); return; }
+            root.recJoined = joinOut.text.trim();
+            framesProc.start();
+        }
+    }
+
+    Process {
+        id: framesProc
+        stdout: StdioCollector { id: framesOut }
+        stderr: StdioCollector { id: framesErr }
+        function start() {
+            command = [root.recHelper, "frames", root.recJoined,
+                String(root.gifFps), root.recFrameDir];
+            running = true;
+        }
+        onExited: (code) => {
+            if (code !== 0) { root.recFail(framesErr.text.trim()); return; }
+            var n = parseInt(framesOut.text.trim(), 10);
+            if (!(n > 0)) { root.recFail(I18n.tr("notify.record_no_frames")); return; }
+            root.recFrameCount = n;
+            root.recPhase = "review";
+        }
+    }
+
+    /**
+     * Writes the trimmed range out and then either copies it or reports the
+     * saved file. kind is "gif-copy", "gif-save" or "mp4-copy"; the helper
+     * subcommand and clipboard mime type follow from it.
+     */
+    /** A saved gif needs its folder to exist first; a copy goes to the cache dir. */
+    function recExport(kind, first, last, step, fps) {
+        if (kind === "gif-save" || kind === "mp4-copy") {
+            mkdirProc.run(effectiveSaveDir, function () {
+                exportProc.start(kind, first, last, step, fps);
+            });
+        } else {
+            exportProc.start(kind, first, last, step, fps);
+        }
+    }
+
+    Process {
+        id: exportProc
+        stderr: StdioCollector { id: exportErr }
+        property string kind: ""
+        function start(k, first, last, step, fps) {
+            kind = k;
+            var gif = k !== "mp4-copy";
+            // An mp4 is handed over as a file reference rather than as bytes
+            // (see recCopyProc), so it has to live somewhere that outlasts this
+            // run and the next recording: the save dir, same as a saved gif.
+            var out = (k === "gif-save" || k === "mp4-copy")
+                ? root.effectiveSaveDir + "/" + root.timestampName("rec", gif ? "gif" : "mp4")
+                : root.recRoot + "/out.gif";
+            root.recExportPath = out;
+            root.recBusy = k;
+            command = [root.recHelper, gif ? "gif" : "mp4", root.recFrameDir,
+                String(first), String(last), String(step), String(fps), out];
+            running = true;
+        }
+        onExited: (code) => {
+            root.recBusy = "";
+            if (code !== 0) { root.recFail(exportErr.text.trim()); return; }
+            if (kind === "gif-save") {
+                // Not afterSave(): that copies as image/png, which is the wrong
+                // type for a gif and would strip the animation.
+                if (Config.copyOnSave) recCopyProc.run(root.recExportPath, "image/gif");
+                else root.finish(I18n.tr("notify.recording_saved"),
+                                 root.pretty(root.recExportPath), false, root.recExportPath);
+                return;
+            }
+            recCopyProc.run(root.recExportPath, kind === "mp4-copy" ? "uri" : "image/gif");
+        }
+    }
+
+    /**
+     * Clipboard hand-off. A gif goes over as image/gif, which pastes into
+     * browsers and chat apps. An mp4 does not: next to nothing accepts
+     * video/mp4 off the clipboard, even though the bytes are there, so it goes
+     * as a text/uri-list pointing at the saved file, which is what file
+     * managers and chat apps actually take. mime "uri" selects that form.
+     */
+    Process {
+        id: recCopyProc
+        property string saved: ""
+        property bool asUri: false
+        function run(path, mime) {
+            saved = path;
+            asUri = mime === "uri";
+            if (asUri) {
+                command = ["sh", "-c",
+                    "exec 9>&-; printf 'file://%s\\r\\n' \"$1\" | wl-copy --type text/uri-list",
+                    "_", path];
+            } else {
+                command = ["sh", "-c",
+                    "exec 9>&-; wl-copy --type \"$1\" < \"$2\"", "_", mime, path];
+            }
+            running = true;
+        }
+        onExited: (code) => {
+            if (code !== 0) { root.recFail(I18n.tr("notify.copy_failed")); return; }
+            // The uri form only means anything alongside the path it points at.
+            if (asUri) root.finish(I18n.tr("notify.recording_copied"),
+                                   root.pretty(saved), false, saved);
+            else root.finish(I18n.tr("notify.recording_copied"), "", false, "");
+        }
+    }
+
     function toolbarFor(win) {
+        if (mode === "gif") return { visible: false, x: 0, y: 0 };
         if (phase !== "editing" || !globalSel || outFile !== "") return { visible: false, x: 0, y: 0 };
         if (anchorOverlay() !== win) return { visible: false, x: 0, y: 0 };
         return { visible: true };
@@ -1013,9 +1307,11 @@ ShellRoot {
              * menu. ov.ready flips on the first captured frame, after which the
              * grab is safe: the popup is already in the frozen image.
              */
-            WlrLayershell.keyboardFocus: ov.ready
-                ? WlrKeyboardFocus.Exclusive
-                : WlrKeyboardFocus.None
+            // While recording, the keyboard belongs to the app being recorded;
+            // the bar's buttons are rishot's only input then.
+            WlrLayershell.keyboardFocus: root.recPassThrough || !ov.ready
+                ? WlrKeyboardFocus.None
+                : WlrKeyboardFocus.Exclusive
             WlrLayershell.namespace: "rishot"
 
             /**
@@ -1027,8 +1323,11 @@ ShellRoot {
              * through to the app below until ov.ready, then the mask drops and
              * the overlay takes every event as before.
              */
-            mask: ov.ready ? null : blankMask
+            mask: root.recPassThrough
+                ? (recordBar.visible ? barMask : blankMask)
+                : (ov.ready ? null : blankMask)
             readonly property Region blankMask: Region {}
+            readonly property Region barMask: Region { item: recordBar }
 
             readonly property string scrName: win.modelData.name
             readonly property bool showToolbar: root.toolbarFor(win).visible
@@ -1073,6 +1372,12 @@ ShellRoot {
                 }
                 Keys.onPressed: (e) => {
                     if (root.textEditing) return;
+                    if (root.recPhase === "armed"
+                        && (e.key === Qt.Key_Return || e.key === Qt.Key_Enter)) {
+                        root.recStart();
+                        e.accepted = true;
+                        return;
+                    }
                     if (e.key === Qt.Key_Space && root.phase === "editing") {
                         root.spaceHeld = true;
                         e.accepted = true;
@@ -1120,6 +1425,9 @@ ShellRoot {
                 Overlay {
                     id: ov
                     anchors.fill: parent
+                    // Once recording starts the overlay must not be seen (it
+                    // would be in the video) or felt; only the bar remains.
+                    visible: !root.recActive
                     screenData: win.modelData
                     captureBackend: root.captureBackend
                     captureScale: root.captureScale
@@ -1251,6 +1559,78 @@ ShellRoot {
                                             win.width - width - 8))
                     y: Math.min(toolbar.y + toolbar.height + 6, win.height - height - 8)
                     onPicked: (w) => { root.setToolWidth(w); root.openPopover = ""; }
+                }
+
+                RecordBar {
+                    id: recordBar
+                    visible: root.mode === "gif"
+                        && root.recPhase !== "" && root.recPhase !== "review"
+                        && win.selLocal !== null
+                        && root.anchorOverlay() === win
+                    phase: root.recPhase
+                    elapsedMs: root.recElapsed
+
+                    /**
+                     * Resting place, before the drag offset: clear of the
+                     * recorded rect, below it when there is room, else above.
+                     * A rect tall enough to leave neither gap pins the bar to
+                     * the bottom edge, where it does end up in the video -
+                     * there is nowhere else for it to go, which is the reason
+                     * the grip exists.
+                     */
+                    readonly property real baseX: win.selLocal
+                        ? win.selLocal.x + win.selLocal.w / 2 - width / 2
+                        : 8
+                    readonly property real baseY: {
+                        if (!win.selLocal) return 8;
+                        var below = win.selLocal.y + win.selLocal.h + 12;
+                        if (below + height <= win.height - 8) return below;
+                        var above = win.selLocal.y - height - 12;
+                        if (above >= 8) return above;
+                        return win.height - height - 8;
+                    }
+
+                    x: Math.max(8, Math.min(baseX + root.recBarDX, win.width - width - 8))
+                    y: Math.max(8, Math.min(baseY + root.recBarDY, win.height - height - 8))
+
+                    onDragMoved: (dx, dy) => {
+                        var minDX = 8 - recordBar.baseX;
+                        var maxDX = (win.width - recordBar.width - 8) - recordBar.baseX;
+                        var minDY = 8 - recordBar.baseY;
+                        var maxDY = (win.height - recordBar.height - 8) - recordBar.baseY;
+                        root.recBarDX = Math.max(minDX, Math.min(root.recBarDX + dx, maxDX));
+                        root.recBarDY = Math.max(minDY, Math.min(root.recBarDY + dy, maxDY));
+                    }
+                    onDragReset: { root.recBarDX = 0; root.recBarDY = 0; }
+
+                    onRecord: root.recStart()
+                    onPause: root.recPause()
+                    onResume: root.recResume()
+                    onStop: root.recStop()
+                    onCancel: Qt.quit()
+                }
+
+                // The review panel replaces the overlay rather than sitting on
+                // it, so it brings its own backdrop.
+                Rectangle {
+                    visible: root.recPhase === "review" && root.anchorOverlay() === win
+                    anchors.fill: parent
+                    color: Theme.dim
+                }
+
+                GifPanel {
+                    id: gifPanel
+                    visible: root.recPhase === "review" && root.anchorOverlay() === win
+                    anchors.centerIn: parent
+                    frameDir: root.recFrameDir
+                    frameCount: root.recFrameCount
+                    baseFps: root.gifFps
+                    busy: root.recBusy
+
+                    onCopyGif: (first, last, step, fps) => root.recExport("gif-copy", first, last, step, fps)
+                    onCopyMp4: (first, last, step, fps) => root.recExport("mp4-copy", first, last, step, fps)
+                    onSaveGif: (first, last, step, fps) => root.recExport("gif-save", first, last, step, fps)
+                    onCancel: Qt.quit()
                 }
 
             }

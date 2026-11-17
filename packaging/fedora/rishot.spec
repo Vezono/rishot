@@ -34,6 +34,11 @@ Recommends:     kdialog
 Recommends:     libnotify
 Recommends:     tesseract
 Recommends:     zbar
+# rishot gif: the recorder plus ffmpeg, and gifski for better gif encoding.
+Recommends:     ffmpeg
+Recommends:     wl-screenrec
+Suggests:       wf-recorder
+Suggests:       gifski
 Suggests:       cliphist
 
 %description
@@ -57,6 +62,7 @@ through spectacle, which KWin needs because it speaks no screencopy protocol.
 find src -type f -exec install -Dm644 '{}' '%{buildroot}%{_datadir}/rishot/{}' ';'
 
 install -Dm755 bin/rishot %{buildroot}%{_bindir}/rishot
+install -Dm755 bin/rishot-record %{buildroot}%{_bindir}/rishot-record
 install -Dm644 rishot.desktop %{buildroot}%{_datadir}/applications/rishot.desktop
 install -Dm644 packaging/rishot.svg %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/rishot.svg
 
@@ -67,6 +73,7 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/rishot.desktop
 %license LICENSE
 %doc README.md
 %{_bindir}/rishot
+%{_bindir}/rishot-record
 %{_datadir}/rishot/
 %{_datadir}/applications/rishot.desktop
 %{_datadir}/icons/hicolor/scalable/apps/rishot.svg
