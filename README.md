@@ -101,7 +101,7 @@ bindsym Print exec rishot                          # Sway
 ```
 
 Run `rishot` for region, window, or the monitor under a desktop click, `rishot monitor` for a whole output,
-`rishot gif` to record a region instead of grabbing one. Add `--clipboard` to copy the shot without opening the editor, `--raw` to write the PNG to stdout, `--text` or `--qr` to copy and print the text or codes in it:
+`rishot gif` to record a region instead of grabbing one. Add `--new-instance` to run an overlay alongside a running one rather than replacing it, which is what recording rishot with rishot needs. Add `--clipboard` to copy the shot without opening the editor, `--raw` to write the PNG to stdout, `--text` or `--qr` to copy and print the text or codes in it:
 
 ```sh
 rishot --clipboard

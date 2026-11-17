@@ -83,6 +83,7 @@ opciones:
   --raw                omite el editor y escribe el PNG en la salida estándar
   --text               omite el editor, copia e imprime el texto de la captura (OCR)
   --qr                 omite el editor, copia e imprime todos los códigos QR y de barras
+  -n, --new-instance   se ejecuta junto a un rishot abierto en vez de reemplazarlo
   -h, --help           muestra esta ayuda
 
 Las cuatro opciones terminan con 1 cuando la captura se cancela o falla; --text y --qr
@@ -111,6 +112,7 @@ options:
   --raw            skip the editor, write the PNG to stdout
   --text           skip the editor, copy and print the text in the shot (OCR)
   --qr             skip the editor, copy and print every QR code and barcode
+  -n, --new-instance  run alongside a running rishot instead of replacing it
   -h, --help       show this help
 
 All four exit 1 when the capture is cancelled or fails, --text and --qr also
@@ -135,11 +137,13 @@ strip_ctl() {
 mode=region
 output=""
 need=""
+multi=0
 for arg; do
 	case "$arg" in
 		monitor | --monitor | -m) mode=monitor ;;
 		region | --region | -r) mode=region ;;
 		gif | --gif | -g) mode=gif ;;
+		--new-instance | -n) multi=1 ;;
 		--clipboard | -c) output=clipboard ;;
 		--raw) output=raw ;;
 		--text) output=text; need=tesseract ;;
@@ -200,7 +204,8 @@ if [ -z "${RISHOT_RECORD_HELPER:-}" ]; then
 	export RISHOT_RECORD_HELPER
 fi
 
-# Single instance: a second press replaces the open overlay. The lock
+# Single instance: a second press replaces the open overlay, unless
+# --new-instance was passed, which runs alongside instead. The lock
 # is held on fd 9 for the lifetime of qs; clipboard daemons that qs spawns close
 # fd 9 (see shell.qml) so a backgrounded wl-copy cannot pin the lock after exit.
 # Keep the lock in a user-owned dir: XDG_RUNTIME_DIR is per-user 0700, and the
@@ -208,20 +213,44 @@ fi
 rundir="${XDG_RUNTIME_DIR:-$HOME/.cache}"
 mkdir -p "$rundir" 2>/dev/null || rundir="/tmp"
 lock="$rundir/rishot.lock"
-exec 9>"$lock"
-if ! flock -n 9; then
-	# Select only this config, leaving other Quickshell shells alone. Retry in
-	# case the previous launch has the lock but is still registering with qs.
-	attempt=0
-	while :; do
-		qs kill -p "$dir" >/dev/null 2>&1 || :
-		if flock -w 1 9; then break; fi
-		attempt=$((attempt + 1))
-		if [ "$attempt" -ge 5 ]; then
-			echo "rishot: could not stop the previous overlay; relaunch failed" >&2
-			exit 1
-		fi
-	done
+
+if [ "$multi" = 1 ]; then
+	# An independent overlay: it takes no lock, so it neither replaces the
+	# running one nor is replaced by the next ordinary launch. This is what
+	# recording rishot with rishot needs.
+	:
+else
+	# Read the holder's pid before opening the lock: opening it for writing
+	# would truncate the file and lose the pid we are about to need.
+	holder=$(cat "$lock" 2>/dev/null || true)
+
+	# <> rather than >, for the same reason: it does not truncate.
+	exec 9<>"$lock"
+	if ! flock -n 9; then
+		# Replace the instance holding the lock, by pid, so overlays started
+		# with --new-instance are left alone; fall back to the config path when
+		# the lock carries no usable pid. Retry in case the previous launch has
+		# the lock but is still registering with qs.
+		attempt=0
+		while :; do
+			case "$holder" in
+			'' | *[!0-9]*) qs kill -p "$dir" >/dev/null 2>&1 || : ;;
+			*) qs kill --pid "$holder" >/dev/null 2>&1 \
+				|| qs kill -p "$dir" >/dev/null 2>&1 || : ;;
+			esac
+			if flock -w 1 9; then break; fi
+			attempt=$((attempt + 1))
+			if [ "$attempt" -ge 5 ]; then
+				echo "rishot: could not stop the previous overlay; relaunch failed" >&2
+				exit 1
+			fi
+		done
+	fi
+
+	# exec below replaces this shell with qs, keeping the pid, so $$ is the pid
+	# the next launch should kill. Written through its own redirect, which
+	# truncates the file without disturbing the lock held on fd 9.
+	printf '%s\n' "$$" > "$lock"
 fi
 
 # Force Qt to honour the compositor's per-output scale rather than any inherited

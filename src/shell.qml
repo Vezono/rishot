@@ -1041,8 +1041,14 @@ ShellRoot {
      * Working files go in the cache dir, not XDG_RUNTIME_DIR: that is tmpfs on
      * most systems and a few thousand frame PNGs would be held in RAM.
      */
-    readonly property string recRoot: (Quickshell.env("XDG_CACHE_HOME")
+    readonly property string recCacheRoot: (Quickshell.env("XDG_CACHE_HOME")
         || (homeDir + "/.cache")) + "/rishot/record"
+    /**
+     * Per instance, so two overlays can record at once (rishot recording
+     * rishot) without overwriting each other's segments and frames. The
+     * instance id is unique per run, and the dir goes away with the sweep.
+     */
+    readonly property string recRoot: recCacheRoot + "/" + Quickshell.instanceId
     readonly property string recSegDir: recRoot + "/segs"
     readonly property string recFrameDir: recRoot + "/frames"
     readonly property string recHelper: Quickshell.env("RISHOT_RECORD_HELPER") || "rishot-record"
@@ -1121,8 +1127,14 @@ ShellRoot {
         property var cb: null
         function run(then) {
             cb = then;
-            command = ["sh", "-c", "rm -rf \"$1\" && mkdir -p \"$2\"",
-                "_", root.recRoot, root.recSegDir];
+            // Clears this instance's dir only. The find sweeps leftovers from
+            // instances that were killed before they could sweep their own;
+            // a day old means nothing is still recording into it.
+            command = ["sh", "-c",
+                "rm -rf \"$1\" && mkdir -p \"$2\" && "
+                + "find \"$3\" -mindepth 1 -maxdepth 1 -type d -mtime +0 "
+                + "-exec rm -rf {} + 2>/dev/null || true",
+                "_", root.recRoot, root.recSegDir, root.recCacheRoot];
             running = true;
         }
         onExited: () => { var f = cb; cb = null; if (f) f(); }
@@ -1352,6 +1364,11 @@ ShellRoot {
         maximumSize: sizeRelaxed ? Qt.size(8192, 8192) : Qt.size(820, 640)
 
         onVisibleChanged: if (visible) relaxTimer.restart()
+
+        // Closing a toplevel is the compositor's business, not the panel's, so
+        // the cancel button is not the only way out: without this, a window
+        // closed from the titlebar or a keybind leaves its frames on disk.
+        onClosed: { root.recSweep(); Qt.quit(); }
 
         Timer {
             id: relaxTimer
