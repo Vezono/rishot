@@ -117,7 +117,7 @@ Required: `quickshell` (the `qs` binary), Qt 6 (declarative, svg, 5compat, wayla
 
 Optional: `imagemagick` (multi-monitor stitch), `cliphist` (clip history), `curl` (upload), `kdialog` (save dialog and folder picker), `libnotify` (a desktop notification when a shot is copied, saved or uploaded), `tesseract` plus a language pack (OCR; reads with every installed language), `zbar` (QR codes and barcodes).
 
-For `rishot gif`: `ffmpeg`, and one of `wl-screenrec` (preferred, lighter) or `wf-recorder`. `gifski` is optional and produces noticeably better gifs than the ffmpeg palette fallback. Gif mode is wlroots-only for the same reason window-click is: KWin speaks no screencopy protocol, and neither recorder works there.
+For `rishot gif`: `ffmpeg`, and one of `wl-screenrec` (preferred, lighter) or `wf-recorder`. `gifski` is optional and produces noticeably better gifs than the ffmpeg palette fallback — roughly half the size at the same frame count, so it is worth having. A recording unpacks to frames under `~/.cache/rishot/record`, which is emptied when a recording starts and swept once the result has been copied or saved. Gif mode is wlroots-only for the same reason window-click is: KWin speaks no screencopy protocol, and neither recorder works there.
 
 On KDE: `spectacle`, which rishot captures through since KWin has no screencopy protocol. The installer pulls it in when it sees a KDE session.
 

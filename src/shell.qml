@@ -1064,7 +1064,10 @@ ShellRoot {
         recBase = 0;
         recElapsed = 0;
         recStopping = false;
-        mkdirProc.run(recSegDir, function () {
+        // Start from an empty working dir: a previous recording's frames are
+        // the bulk of what rishot ever puts on disk, and leaving them would
+        // also confuse the review panel if this one unpacks to fewer frames.
+        recResetProc.run(function () {
             root.recPhase = "recording";
             root.recSegT0 = Date.now();
             recProc.start(root.recSegment);
@@ -1110,6 +1113,38 @@ ShellRoot {
 
     function recFail(body) {
         root.finish(I18n.tr("notify.record_failed"), body || "", true, "");
+    }
+
+    Process {
+        id: recResetProc
+        property var cb: null
+        function run(then) {
+            cb = then;
+            command = ["sh", "-c", "rm -rf \"$1\" && mkdir -p \"$2\"",
+                "_", root.recRoot, root.recSegDir];
+            running = true;
+        }
+        onExited: () => { var f = cb; cb = null; if (f) f(); }
+    }
+
+    /**
+     * Clears the working dir once the recording has been handed over. Detached,
+     * because every path that calls it quits a moment later and a plain child
+     * would be killed halfway through. The exported gif and mp4 live in the
+     * save dir, and wl-copy has already read the bytes it serves, so there is
+     * nothing here left to lose.
+     */
+    function recSweep() {
+        if (recRoot !== "") recSweepProc.run();
+    }
+
+    Process {
+        id: recSweepProc
+        function run() {
+            command = ["setsid", "-f", "sh", "-c",
+                "exec 9>&-; rm -rf \"$1\"", "_", root.recRoot];
+            running = true;
+        }
     }
 
     Timer {
@@ -1240,9 +1275,10 @@ ShellRoot {
             if (kind === "gif-save") {
                 // Not afterSave(): that copies as image/png, which is the wrong
                 // type for a gif and would strip the animation.
-                if (Config.copyOnSave) recCopyProc.run(root.recExportPath, "image/gif");
-                else root.finish(I18n.tr("notify.recording_saved"),
-                                 root.pretty(root.recExportPath), false, root.recExportPath);
+                if (Config.copyOnSave) { recCopyProc.run(root.recExportPath, "image/gif"); return; }
+                root.recSweep();
+                root.finish(I18n.tr("notify.recording_saved"),
+                            root.pretty(root.recExportPath), false, root.recExportPath);
                 return;
             }
             recCopyProc.run(root.recExportPath, kind === "mp4-copy" ? "uri" : "image/gif");
@@ -1275,6 +1311,7 @@ ShellRoot {
         }
         onExited: (code) => {
             if (code !== 0) { root.recFail(I18n.tr("notify.copy_failed")); return; }
+            root.recSweep();
             // The uri form only means anything alongside the path it points at.
             if (asUri) root.finish(I18n.tr("notify.recording_copied"),
                                    root.pretty(saved), false, saved);
@@ -1640,7 +1677,7 @@ ShellRoot {
                     onCopyGif: (first, last, step, fps) => root.recExport("gif-copy", first, last, step, fps)
                     onCopyMp4: (first, last, step, fps) => root.recExport("mp4-copy", first, last, step, fps)
                     onSaveGif: (first, last, step, fps) => root.recExport("gif-save", first, last, step, fps)
-                    onCancel: Qt.quit()
+                    onCancel: { root.recSweep(); Qt.quit(); }
                 }
 
             }
