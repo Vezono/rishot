@@ -34,10 +34,13 @@ Recommends:     kdialog
 Recommends:     libnotify
 Recommends:     tesseract
 Recommends:     zbar
-# rishot gif: the recorder plus ffmpeg, and gifski for better gif encoding.
+# rishot gif: a recorder plus ffmpeg, and gifski for better gif encoding.
+# wf-recorder is the one Fedora packages; wl-screenrec, which rishot prefers
+# when both are present, is COPR only. Fedora's ffmpeg-free carries no libx264,
+# so rishot-record falls back to openh264 there.
 Recommends:     ffmpeg
-Recommends:     wl-screenrec
-Suggests:       wf-recorder
+Recommends:     wf-recorder
+Suggests:       wl-screenrec
 Suggests:       gifski
 Suggests:       cliphist
 

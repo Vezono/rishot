@@ -31,6 +31,21 @@ MAX_FRAMES=${RISHOT_GIF_MAXFRAMES:-3000}
 
 have ffmpeg || die "ffmpeg is required for gif mode"
 
+# Pick an H.264 encoder rather than assuming libx264. Fedora's ffmpeg-free is
+# built without it (the patent-encumbered encoders are stripped), and installing
+# the full ffmpeg there means adding RPM Fusion, which not everyone will do. The
+# alternatives need different quality flags: libx264 is CRF driven, openh264 is
+# bitrate driven, and mpeg4 is the last resort that every build has.
+h264_encoder() {
+    encoders=$(ffmpeg -hide_banner -encoders 2>/dev/null)
+    case "$encoders" in
+    *" libx264 "*) printf '%s' "libx264 -preset veryfast -crf 20" ;;
+    *" libopenh264 "*) printf '%s' "libopenh264 -b:v 4M" ;;
+    *" mpeg4 "*) printf '%s' "mpeg4 -q:v 4" ;;
+    *) die "ffmpeg has no usable video encoder for mp4" ;;
+    esac
+}
+
 # ffmpeg talks a lot; keep the chatter unless something fails, in which case the
 # caller wants the real error. -nostdin stops it eating the overlay's stdin.
 ff() {
@@ -167,10 +182,12 @@ cmd_mp4() {
 	frame_list "$framedir" "$first" "$last" "$step" "$fps" "$list" >/dev/null
 
 	# yuv420p needs even dimensions and a dragged region is any size, so round
-	# down rather than let the encoder refuse.
+	# down rather than let the encoder refuse. The encoder and its quality flag
+	# are unquoted on purpose: they are several arguments, not one.
+	enc=$(h264_encoder)
 	ff -f concat -safe 0 -i "$list" \
 		-vf "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p" \
-		-c:v libx264 -preset veryfast -crf 20 -movflags +faststart \
+		-c:v $enc -movflags +faststart \
 		-r "$fps" "$out" \
 		|| die "could not write the mp4"
 	printf '%s' "$out"
